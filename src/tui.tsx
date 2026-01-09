@@ -15,6 +15,7 @@ import type { Competition, CompetitionResult } from "./types";
 
 const DATA_DIR = join(homedir(), ".svnl-scraper");
 const CACHE_FILE = join(DATA_DIR, "competitions.json");
+const SETTINGS_FILE = join(DATA_DIR, "settings.json");
 
 type Screen = "menu" | "discover" | "list" | "scrape" | "scraping" | "settings";
 type OutputMode = "per-competition" | "combined";
@@ -27,12 +28,14 @@ function App() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [outputMode, setOutputMode] = useState<OutputMode>("per-competition");
   const [outputDir, setOutputDir] = useState("./output");
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
   // Load cached competitions on start
   useEffect(() => {
     loadCache();
+    loadSettings();
   }, []);
 
   async function loadCache() {
@@ -46,6 +49,32 @@ function App() {
     await mkdir(DATA_DIR, { recursive: true });
     await writeFile(CACHE_FILE, JSON.stringify(comps, null, 2));
   }
+
+  async function loadSettings() {
+    if (existsSync(SETTINGS_FILE)) {
+      const data = JSON.parse(await readFile(SETTINGS_FILE, "utf-8"));
+      if (data.outputMode === "per-competition" || data.outputMode === "combined") {
+        setOutputMode(data.outputMode);
+      }
+      if (typeof data.outputDir === "string" && data.outputDir.trim()) {
+        setOutputDir(data.outputDir);
+      }
+    }
+    setSettingsLoaded(true);
+  }
+
+  async function saveSettings() {
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(
+      SETTINGS_FILE,
+      JSON.stringify({ outputMode, outputDir }, null, 2),
+    );
+  }
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    saveSettings();
+  }, [outputMode, outputDir, settingsLoaded]);
 
   return (
     <Box flexDirection="column" padding={1}>
