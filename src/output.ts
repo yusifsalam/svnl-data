@@ -1,7 +1,7 @@
 // CSV and JSON output generation
 
 import { mkdir, writeFile } from "fs/promises";
-import { dirname } from "path";
+import { dirname, join, resolve } from "path";
 import type { Attempt, CompetitionResult } from "./types";
 
 /**
@@ -105,13 +105,14 @@ export async function writeResultsPerCompetition(
   format: "csv" | "json",
 ): Promise<string[]> {
   const paths: string[] = [];
-  await mkdir(outputDir, { recursive: true });
+  const resolvedDir = resolve(outputDir);
+  await mkdir(resolvedDir, { recursive: true });
 
   for (const result of results) {
     const filename = `${sanitizeFilename(result.competition.id)}.${format}`;
-    const path = `${outputDir}/${filename}`;
-    await writeResults([result], path, format);
-    paths.push(path);
+    const filePath = join(resolvedDir, filename);
+    await writeResults([result], filePath, format);
+    paths.push(filePath);
   }
 
   return paths;

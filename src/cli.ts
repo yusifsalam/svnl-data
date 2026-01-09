@@ -6,7 +6,7 @@ import { Command } from "commander";
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
-import { join } from "path";
+import { join, resolve } from "path";
 import { writeResults, writeResultsPerCompetition } from "./output";
 import { discoverCompetitions, scrapeCompetitions } from "./scraper";
 import type { Competition, JsonEvent } from "./types";
@@ -112,7 +112,7 @@ program
 program
   .command("scrape <ids...>")
   .description("Scrape specific competitions by ID")
-  .option("-o, --output <dir>", "Output directory", ".")
+  .option("-o, --output <dir>", "Output directory", "./output")
   .option("-f, --format <type>", "Output format (csv|json)", "csv")
   .option("--combined", "Write all competitions into one file")
   .option("--json", "Output JSON events (for SwiftUI)")
@@ -159,14 +159,15 @@ program
 
       // Write output
       const timestamp = Date.now();
-      let outputPath = join(opts.output, `results_${timestamp}.${opts.format}`);
+      const outputDir = resolve(opts.output);
+      let outputPath = join(outputDir, `results_${timestamp}.${opts.format}`);
       let outputPaths: string[] | null = null;
       if (opts.combined) {
         await writeResults(results, outputPath, opts.format);
       } else {
         outputPaths = await writeResultsPerCompetition(
           results,
-          opts.output,
+          outputDir,
           opts.format,
         );
         outputPath = outputPaths[0] || outputPath;
@@ -195,9 +196,7 @@ program
         );
         if (outputPaths) {
           console.log(
-            chalk.gray(
-              `  Output: ${opts.output} (${outputPaths.length} files)`,
-            ),
+            chalk.gray(`  Output: ${outputDir} (${outputPaths.length} files)`),
           );
         } else {
           console.log(chalk.gray(`  Output: ${outputPath}`));
@@ -219,7 +218,7 @@ program
 program
   .command("scrape-all")
   .description("Scrape all cached competitions")
-  .option("-o, --output <dir>", "Output directory", ".")
+  .option("-o, --output <dir>", "Output directory", "./output")
   .option("-f, --format <type>", "Output format (csv|json)", "csv")
   .option("--combined", "Write all competitions into one file")
   .option("--json", "Output JSON events (for SwiftUI)")
@@ -258,14 +257,15 @@ program
       });
 
       const timestamp = Date.now();
-      let outputPath = join(opts.output, `results_${timestamp}.${opts.format}`);
+      const outputDir = resolve(opts.output);
+      let outputPath = join(outputDir, `results_${timestamp}.${opts.format}`);
       let outputPaths: string[] | null = null;
       if (opts.combined) {
         await writeResults(results, outputPath, opts.format);
       } else {
         outputPaths = await writeResultsPerCompetition(
           results,
-          opts.output,
+          outputDir,
           opts.format,
         );
         outputPath = outputPaths[0] || outputPath;
@@ -294,9 +294,7 @@ program
         );
         if (outputPaths) {
           console.log(
-            chalk.gray(
-              `  Output: ${opts.output} (${outputPaths.length} files)`,
-            ),
+            chalk.gray(`  Output: ${outputDir} (${outputPaths.length} files)`),
           );
         } else {
           console.log(chalk.gray(`  Output: ${outputPath}`));

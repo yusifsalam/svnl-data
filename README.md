@@ -47,8 +47,10 @@ bun run cli scrape-all [--output <dir>] [--format csv|json] [--combined] [--json
 ```
 
 The `--json` flag outputs machine-readable JSON events for integration use.
-By default, `scrape`/`scrape-all` write one file per competition; pass `--combined`
-to write a single CSV/JSON file.
+By default, `scrape`/`scrape-all` write one file per competition into `./output`;
+pass `--combined` to write a single CSV/JSON file.
+
+In the TUI, output defaults to `./output`; you can change it under Settings.
 
 In the TUI, per-competition output is the default; change it under Settings.
 

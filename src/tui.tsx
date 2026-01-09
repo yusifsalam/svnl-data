@@ -26,6 +26,7 @@ function App() {
   const [scrapeSelection, setScrapeSelection] = useState<Competition[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [outputMode, setOutputMode] = useState<OutputMode>("per-competition");
+  const [outputDir, setOutputDir] = useState("./output");
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
@@ -132,18 +133,18 @@ function App() {
           progress={progress}
           onProgress={setProgress}
           onComplete={async (results) => {
-            const outputPath = join(".", `results_${Date.now()}.csv`);
             if (outputMode === "combined") {
-              await writeResults(results, outputPath, "csv");
-              setProgress(`Saved to ${outputPath}`);
+              const path = join(outputDir, `results_${Date.now()}.csv`);
+              await writeResults(results, path, "csv");
+              setProgress(`Saved to ${path}`);
             } else {
               const outputPaths = await writeResultsPerCompetition(
                 results,
-                ".",
+                outputDir,
                 "csv",
               );
               setProgress(
-                `Saved ${outputPaths.length} files to ${join(".", "")}`,
+                `Saved ${outputPaths.length} files to ${outputDir}`,
               );
             }
             setSelectedIds(new Set());
@@ -161,6 +162,8 @@ function App() {
         <SettingsView
           outputMode={outputMode}
           onChange={(mode) => setOutputMode(mode)}
+          outputDir={outputDir}
+          onOutputDirChange={(dir) => setOutputDir(dir)}
           onBack={() => setScreen("menu")}
         />
       )}
@@ -194,14 +197,49 @@ function MainMenu({ onSelect }: { onSelect: (action: string) => void }) {
 function SettingsView({
   outputMode,
   onChange,
+  outputDir,
+  onOutputDirChange,
   onBack,
 }: {
   outputMode: OutputMode;
   onChange: (mode: OutputMode) => void;
+  outputDir: string;
+  onOutputDirChange: (dir: string) => void;
   onBack: () => void;
 }) {
+  const [editingDir, setEditingDir] = useState(false);
+  const [dirInput, setDirInput] = useState(outputDir);
+
   useInput((input, key) => {
-    if (key.escape) onBack();
+    if (key.escape) {
+      if (editingDir) {
+        setEditingDir(false);
+        setDirInput(outputDir);
+      } else {
+        onBack();
+      }
+      return;
+    }
+    if (!editingDir) return;
+    if (key.return) {
+      let next = dirInput.trim() || ".";
+      if (next.startsWith("./Users/")) {
+        next = next.slice(1);
+      }
+      if (next.startsWith("./Volumes/")) {
+        next = next.slice(1);
+      }
+      onOutputDirChange(next);
+      setEditingDir(false);
+      return;
+    }
+    if (key.backspace || key.delete) {
+      setDirInput((prev) => prev.slice(0, -1));
+      return;
+    }
+    if (input) {
+      setDirInput((prev) => prev + input);
+    }
   });
 
   const items = [
@@ -213,6 +251,10 @@ function SettingsView({
       label: `${outputMode === "combined" ? "●" : "○"} Output: combined`,
       value: "combined",
     },
+    {
+      label: `Output directory: ${outputDir}`,
+      value: "output-dir",
+    },
     { label: "Back", value: "back" },
   ];
 
@@ -220,17 +262,28 @@ function SettingsView({
     <Box flexDirection="column">
       <Text bold>Settings</Text>
       <Box marginTop={1}>
-        <SelectInput
-          items={items}
-          onSelect={(item) => {
-            if (item.value === "back") {
-              onBack();
-            } else {
-              onChange(item.value as OutputMode);
-              onBack();
-            }
-          }}
-        />
+        {editingDir ? (
+          <Box flexDirection="column">
+            <Text>Output directory (Enter to save, Esc to cancel):</Text>
+            <Text color="gray">Current: {outputDir}</Text>
+            <Text color="cyan">{dirInput || " "}</Text>
+          </Box>
+        ) : (
+          <SelectInput
+            items={items}
+            onSelect={(item) => {
+              if (item.value === "back") {
+                onBack();
+              } else if (item.value === "output-dir") {
+                setDirInput("");
+                setEditingDir(true);
+              } else {
+                onChange(item.value as OutputMode);
+                onBack();
+              }
+            }}
+          />
+        )}
       </Box>
       <Box marginTop={1}>
         <Text color="gray">Escape to go back</Text>
