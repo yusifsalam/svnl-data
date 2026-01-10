@@ -33,6 +33,22 @@ bun run tui
 bun run build:cli
 ```
 
+## SwiftUI App
+
+The macOS SwiftUI app lives in `SVNLScraper/`. It bundles the compiled CLI
+binary (`svnl-cli`) and runs it for discover/scrape operations.
+
+Open `SVNLScraper/SVNLScraper.xcodeproj` in Xcode and build the **Release**
+configuration to bundle the CLI automatically. The build phase runs:
+
+```
+bun run build:cli
+```
+
+The app stores CSV/JSON output under `~/Documents/SVNLScraper` by default, and
+logs under `~/Documents/SVNLScraper/logs/svnl-log.jsonl`. Both can be changed
+in the app Settings.
+
 ## CLI Commands
 
 ```bash
@@ -70,7 +86,7 @@ Compile the CLI into a single executable for embedding or distribution:
 bun run build:cli
 ```
 
-The output binary is written to `dist/svnl`.
+The output binary is written to `dist/svnl-cli`.
 
 ## How It Works
 

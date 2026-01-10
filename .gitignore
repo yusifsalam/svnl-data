@@ -38,6 +38,9 @@ results_*.json
 cache/
 output/
 
+# Bundled CLI artifacts
+SVNLScraper/SVNLScraper/Resources/svnl-cli
+
 # Logs
 *.log
 logs/
