@@ -59,6 +59,23 @@ src/
 SVNL Archive → Puppeteer → Competition URLs → fetch → HTML → parser → Lifter Data → CSV/JSON
 ```
 
+## Code Style
+
+### Comments
+
+Avoid unnecessary comments. Code should be self-documenting through clear naming and structure.
+
+**Remove:**
+- Header comments that restate the filename ("SVNL Scraper CLI")
+- Section markers ("// Identity", "// Progress", "// Header")
+- Obvious comments that describe what code does ("// Save to cache", "// Find competitions by ID")
+
+**Keep:**
+- WHY explanations ("Discovery uses Puppeteer - SVNL archive has 'Load more' buttons")
+- Performance notes ("O(1) indexing instead of O(n) String indexing")
+- Non-obvious behavior ("Fallback to app output on failure")
+- Important caveats ("Limit size to avoid memory leaks")
+
 ## Parser Strategy
 
 The parser handles SVNL table format variations:
