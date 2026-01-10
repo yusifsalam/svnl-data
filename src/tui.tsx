@@ -9,6 +9,7 @@ import Spinner from "ink-spinner";
 import { homedir } from "os";
 import { join } from "path";
 import { useEffect, useState } from "react";
+import { appendLog } from "./log";
 import { writeResults, writeResultsPerCompetition } from "./output";
 import { discoverCompetitions, scrapeCompetitions } from "./scraper";
 import type { Competition, CompetitionResult } from "./types";
@@ -28,9 +29,11 @@ function App() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [outputMode, setOutputMode] = useState<OutputMode>("per-competition");
   const [outputDir, setOutputDir] = useState("./output");
+  const [logDir, setLogDir] = useState("./logs");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+  const [scrapeStartedAt, setScrapeStartedAt] = useState<number | null>(null);
 
   // Load cached competitions on start
   useEffect(() => {
@@ -59,6 +62,9 @@ function App() {
       if (typeof data.outputDir === "string" && data.outputDir.trim()) {
         setOutputDir(data.outputDir);
       }
+      if (typeof data.logDir === "string" && data.logDir.trim()) {
+        setLogDir(data.logDir);
+      }
     }
     setSettingsLoaded(true);
   }
@@ -67,14 +73,14 @@ function App() {
     await mkdir(DATA_DIR, { recursive: true });
     await writeFile(
       SETTINGS_FILE,
-      JSON.stringify({ outputMode, outputDir }, null, 2),
+      JSON.stringify({ outputMode, outputDir, logDir }, null, 2),
     );
   }
 
   useEffect(() => {
     if (!settingsLoaded) return;
     saveSettings();
-  }, [outputMode, outputDir, settingsLoaded]);
+  }, [outputMode, outputDir, logDir, settingsLoaded]);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -110,13 +116,24 @@ function App() {
           onStart={async () => {
             setProgress("Starting discovery...");
             try {
+              const startedAt = Date.now();
               const comps = await discoverCompetitions({
                 loadMoreClicks: 5,
                 onProgress: setProgress,
               });
               setCompetitions(comps);
               await saveCache(comps);
-              setProgress(`Found ${comps.length} competitions!`);
+              const logPath = join(logDir, "svnl-log.jsonl");
+              await appendLog(
+                {
+                  timestamp: new Date().toISOString(),
+                  operation: "discover",
+                  durationMs: Date.now() - startedAt,
+                  details: { competitions: comps.length },
+                },
+                logDir,
+              );
+              setProgress(`Found ${comps.length} competitions! Log: ${logPath}`);
               setTimeout(() => setScreen("menu"), 2000);
             } catch (e) {
               setError(e instanceof Error ? e.message : String(e));
@@ -150,6 +167,7 @@ function App() {
           onStart={() => {
             const selected = competitions.filter((c) => selectedIds.has(c.id));
             setScrapeSelection(selected);
+            setScrapeStartedAt(Date.now());
             setScreen("scraping");
           }}
           onBack={() => setScreen("menu")}
@@ -162,11 +180,13 @@ function App() {
           progress={progress}
           onProgress={setProgress}
           onComplete={async (results) => {
+            const startedAt = scrapeStartedAt ?? Date.now();
+            const logPath = join(logDir, "svnl-log.jsonl");
             if (outputMode === "combined") {
               setProgress("Saving file...");
               const path = join(outputDir, `results_${Date.now()}.csv`);
               await writeResults(results, path, "csv");
-              setProgress(`Saved to ${path}`);
+              setProgress(`Saved to ${path} | Log: ${logPath}`);
             } else {
               setProgress("Saving files...");
               const outputPaths = await writeResultsPerCompetition(
@@ -175,12 +195,32 @@ function App() {
                 "csv",
               );
               setProgress(
-                `Saved ${outputPaths.length} files to ${outputDir}`,
+                `Saved ${outputPaths.length} files to ${outputDir} | Log: ${logPath}`,
               );
             }
+            await appendLog(
+              {
+                timestamp: new Date().toISOString(),
+                operation: "scrape",
+                durationMs: Date.now() - startedAt,
+              details: {
+                competitions: results.length,
+                lifters: results.reduce(
+                  (sum, r) => sum + r.lifters.length,
+                  0,
+                ),
+                competitionIds: results.map((result) => result.competition.id),
+                combined: outputMode === "combined",
+                format: "csv",
+                outputDir,
+              },
+          },
+              logDir,
+          );
             setSelectedIds(new Set());
             setTimeout(() => {
               setScrapeSelection([]);
+              setScrapeStartedAt(null);
               setScreen("menu");
             }, 3000);
           }}
@@ -197,6 +237,8 @@ function App() {
           onChange={(mode) => setOutputMode(mode)}
           outputDir={outputDir}
           onOutputDirChange={(dir) => setOutputDir(dir)}
+          logDir={logDir}
+          onLogDirChange={(dir) => setLogDir(dir)}
           onBack={() => setScreen("menu")}
         />
       )}
@@ -232,28 +274,34 @@ function SettingsView({
   onChange,
   outputDir,
   onOutputDirChange,
+  logDir,
+  onLogDirChange,
   onBack,
 }: {
   outputMode: OutputMode;
   onChange: (mode: OutputMode) => void;
   outputDir: string;
   onOutputDirChange: (dir: string) => void;
+  logDir: string;
+  onLogDirChange: (dir: string) => void;
   onBack: () => void;
 }) {
-  const [editingDir, setEditingDir] = useState(false);
-  const [dirInput, setDirInput] = useState(outputDir);
+  const [editingField, setEditingField] = useState<"output" | "log" | null>(
+    null,
+  );
+  const [dirInput, setDirInput] = useState("");
 
   useInput((input, key) => {
     if (key.escape) {
-      if (editingDir) {
-        setEditingDir(false);
-        setDirInput(outputDir);
+      if (editingField) {
+        setEditingField(null);
+        setDirInput(editingField === "output" ? outputDir : logDir);
       } else {
         onBack();
       }
       return;
     }
-    if (!editingDir) return;
+    if (!editingField) return;
     if (key.return) {
       let next = dirInput.trim() || ".";
       if (next.startsWith("./Users/")) {
@@ -262,8 +310,12 @@ function SettingsView({
       if (next.startsWith("./Volumes/")) {
         next = next.slice(1);
       }
-      onOutputDirChange(next);
-      setEditingDir(false);
+      if (editingField === "output") {
+        onOutputDirChange(next);
+      } else {
+        onLogDirChange(next);
+      }
+      setEditingField(null);
       return;
     }
     if (key.backspace || key.delete) {
@@ -288,6 +340,10 @@ function SettingsView({
       label: `Output directory: ${outputDir}`,
       value: "output-dir",
     },
+    {
+      label: `Log directory: ${logDir}`,
+      value: "log-dir",
+    },
     { label: "Back", value: "back" },
   ];
 
@@ -295,10 +351,15 @@ function SettingsView({
     <Box flexDirection="column">
       <Text bold>Settings</Text>
       <Box marginTop={1}>
-        {editingDir ? (
+        {editingField ? (
           <Box flexDirection="column">
-            <Text>Output directory (Enter to save, Esc to cancel):</Text>
-            <Text color="gray">Current: {outputDir}</Text>
+            <Text>
+              {editingField === "output" ? "Output" : "Log"} directory (Enter to
+              save, Esc to cancel):
+            </Text>
+            <Text color="gray">
+              Current: {editingField === "output" ? outputDir : logDir}
+            </Text>
             <Text color="cyan">{dirInput || " "}</Text>
           </Box>
         ) : (
@@ -309,7 +370,10 @@ function SettingsView({
                 onBack();
               } else if (item.value === "output-dir") {
                 setDirInput("");
-                setEditingDir(true);
+                setEditingField("output");
+              } else if (item.value === "log-dir") {
+                setDirInput("");
+                setEditingField("log");
               } else {
                 onChange(item.value as OutputMode);
                 onBack();

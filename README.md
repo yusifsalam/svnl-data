@@ -34,16 +34,16 @@ bun run tui
 
 ```bash
 # Discover competitions (clicks "Load more" 5 times by default)
-bun run cli discover [--clicks <n>] [--browser <path>] [--json]
+bun run cli discover [--clicks <n>] [--browser <path>] [--log-dir <dir>] [--json]
 
 # List cached competitions
 bun run cli list [--format table|json]
 
 # Scrape specific competitions by ID
-bun run cli scrape <ids...> [--output <dir>] [--format csv|json] [--combined] [--json]
+bun run cli scrape <ids...> [--output <dir>] [--format csv|json] [--combined] [--log-dir <dir>] [--json]
 
 # Scrape all cached competitions
-bun run cli scrape-all [--output <dir>] [--format csv|json] [--combined] [--json]
+bun run cli scrape-all [--output <dir>] [--format csv|json] [--combined] [--log-dir <dir>] [--json]
 ```
 
 The `--json` flag outputs machine-readable JSON events for integration use.
@@ -51,8 +51,7 @@ By default, `scrape`/`scrape-all` write one file per competition into `./output`
 pass `--combined` to write a single CSV/JSON file.
 
 In the TUI, output defaults to `./output`; you can change it under Settings.
-
-In the TUI, per-competition output is the default; change it under Settings.
+Per-competition output is the default; change it under Settings.
 
 ## Requirements
 
@@ -72,6 +71,14 @@ In the TUI, per-competition output is the default; change it under Settings.
 - `equipment` is `raw` or `equipped`
 - `weight_class` is stored as a string (e.g. `-57`, `84+`)
 - attempt success columns use `*_success` suffix
+
+## Logs
+
+Each operation appends a JSONL entry to `svnl-log.jsonl` with the operation
+name and duration in milliseconds.
+
+- Logs default to `./logs` unless `--log-dir` is set
+- In the TUI, log output defaults to `./logs` and is configurable under Settings
 
 ## Configuration
 

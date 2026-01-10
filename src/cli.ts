@@ -7,6 +7,7 @@ import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { join, resolve } from "path";
+import { appendLog } from "./log";
 import { writeResults, writeResultsPerCompetition } from "./output";
 import { discoverCompetitions, scrapeCompetitions } from "./scraper";
 import type { Competition, JsonEvent } from "./types";
@@ -31,9 +32,13 @@ program
   .description("Discover competitions from SVNL archive")
   .option("-c, --clicks <number>", "Number of 'Load more' clicks", "0")
   .option("-b, --browser <path>", "Path to Chrome/Chromium")
+  .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--json", "Output JSON events (for SwiftUI)")
   .action(async (opts) => {
     const isJson = opts.json;
+    const startedAt = Date.now();
+    const logDir = resolve(opts.logDir);
+    const logPath = join(logDir, "svnl-log.jsonl");
 
     try {
       const competitions = await discoverCompetitions({
@@ -51,6 +56,15 @@ program
       // Save to cache
       await mkdir(DATA_DIR, { recursive: true });
       await writeFile(CACHE_FILE, JSON.stringify(competitions, null, 2));
+      await appendLog(
+        {
+          timestamp: new Date().toISOString(),
+          operation: "discover",
+          durationMs: Date.now() - startedAt,
+          details: { competitions: competitions.length },
+        },
+        logDir,
+      );
 
       if (isJson) {
         jsonEvent({ type: "complete", data: competitions });
@@ -59,6 +73,7 @@ program
           chalk.green(`\n✓ Found ${competitions.length} competitions`),
         );
         console.log(chalk.gray(`  Saved to ${CACHE_FILE}`));
+        console.log(chalk.gray(`  Log: ${logPath}`));
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -114,10 +129,12 @@ program
   .description("Scrape specific competitions by ID")
   .option("-o, --output <dir>", "Output directory", "./output")
   .option("-f, --format <type>", "Output format (csv|json)", "csv")
+  .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--combined", "Write all competitions into one file")
   .option("--json", "Output JSON events (for SwiftUI)")
   .action(async (ids: string[], opts) => {
     const isJson = opts.json;
+    const startedAt = Date.now();
 
     if (!existsSync(CACHE_FILE)) {
       const msg = "No cached competitions. Run 'svnl discover' first.";
@@ -160,6 +177,8 @@ program
       // Write output
       const timestamp = Date.now();
       const outputDir = resolve(opts.output);
+      const logDir = resolve(opts.logDir);
+      const logPath = join(logDir, "svnl-log.jsonl");
       let outputPath = join(outputDir, `results_${timestamp}.${opts.format}`);
       let outputPaths: string[] | null = null;
       if (opts.combined) {
@@ -176,6 +195,22 @@ program
       const totalLifters = results.reduce(
         (sum, r) => sum + r.lifters.length,
         0,
+      );
+      await appendLog(
+        {
+          timestamp: new Date().toISOString(),
+          operation: "scrape",
+          durationMs: Date.now() - startedAt,
+          details: {
+            competitions: results.length,
+            lifters: totalLifters,
+            competitionIds: results.map((result) => result.competition.id),
+            combined: Boolean(opts.combined),
+            format: opts.format,
+            outputDir,
+          },
+        },
+        logDir,
       );
 
       if (isJson) {
@@ -201,6 +236,7 @@ program
         } else {
           console.log(chalk.gray(`  Output: ${outputPath}`));
         }
+        console.log(chalk.gray(`  Log: ${logPath}`));
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -220,10 +256,12 @@ program
   .description("Scrape all cached competitions")
   .option("-o, --output <dir>", "Output directory", "./output")
   .option("-f, --format <type>", "Output format (csv|json)", "csv")
+  .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--combined", "Write all competitions into one file")
   .option("--json", "Output JSON events (for SwiftUI)")
   .action(async (opts) => {
     const isJson = opts.json;
+    const startedAt = Date.now();
 
     if (!existsSync(CACHE_FILE)) {
       const msg = "No cached competitions. Run 'svnl discover' first.";
@@ -258,6 +296,8 @@ program
 
       const timestamp = Date.now();
       const outputDir = resolve(opts.output);
+      const logDir = resolve(opts.logDir);
+      const logPath = join(logDir, "svnl-log.jsonl");
       let outputPath = join(outputDir, `results_${timestamp}.${opts.format}`);
       let outputPaths: string[] | null = null;
       if (opts.combined) {
@@ -274,6 +314,22 @@ program
       const totalLifters = results.reduce(
         (sum, r) => sum + r.lifters.length,
         0,
+      );
+      await appendLog(
+        {
+          timestamp: new Date().toISOString(),
+          operation: "scrape-all",
+          durationMs: Date.now() - startedAt,
+          details: {
+            competitions: results.length,
+            lifters: totalLifters,
+            competitionIds: results.map((result) => result.competition.id),
+            combined: Boolean(opts.combined),
+            format: opts.format,
+            outputDir,
+          },
+        },
+        logDir,
       );
 
       if (isJson) {
@@ -299,6 +355,7 @@ program
         } else {
           console.log(chalk.gray(`  Output: ${outputPath}`));
         }
+        console.log(chalk.gray(`  Log: ${logPath}`));
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
