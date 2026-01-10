@@ -32,9 +32,17 @@ export interface Lifter {
   position: number;
 }
 
+export interface ScrapeMetadata {
+  competitionId: string;
+  skipped: boolean;
+  cached: boolean;
+  hashMatch: boolean;
+}
+
 export interface CompetitionResult {
   competition: Competition;
   lifters: Lifter[];
+  metadata?: ScrapeMetadata;
 }
 
 export type ProgressCallback = (message: string) => void;

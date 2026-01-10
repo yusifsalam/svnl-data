@@ -40,6 +40,12 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
                 .tint(.blue)
 
+                Toggle(isOn: $settings.forceMode) {
+                    Label("Force", systemImage: settings.forceMode ? "bolt.fill" : "bolt.slash")
+                }
+                .toggleStyle(.button)
+                .tint(settings.forceMode ? .orange : .gray)
+                .help("Force re-scrape (bypass cache)")
 
                 Button {
                     let ids = Array(competitionViewModel.selectedIds)

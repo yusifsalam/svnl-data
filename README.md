@@ -14,7 +14,8 @@ A powerlifting competition data scraper for [Suomen Voimanostoliitto](https://ww
 
 - **CLI** - Command-line interface for scripting and automation
 - **TUI** - Interactive terminal UI with menus
-- **Native macOS App** - GUI built with SwiftUI 
+- **Native macOS App** - GUI built with SwiftUI
+- **Incremental updates** - Caches HTML with hash comparison, skips unchanged competitions
 - **JSON Output** - Machine-readable output for app integration
 - **Per-competition output** - One file per competition by default (combined optional)
 
@@ -69,19 +70,24 @@ bun run cli discover [--clicks <n>] [--browser <path>] [--log-dir <dir>] [--json
 bun run cli list [--format table|json]
 
 # Scrape specific competitions by ID
-bun run cli scrape <ids...> [--output <dir>] [--format csv|json] [--combined] [--log-dir <dir>] [--json]
+bun run cli scrape <ids...> [--output <dir>] [--format csv|json] [--combined] [--force] [--log-dir <dir>] [--json]
 
 # Scrape all cached competitions
-bun run cli scrape-all [--output <dir>] [--format csv|json] [--combined] [--log-dir <dir>] [--json]
+bun run cli scrape-all [--output <dir>] [--format csv|json] [--combined] [--force] [--log-dir <dir>] [--json]
 ```
 
 The `--json` flag outputs machine-readable JSON events for integration use.
 By default, `scrape`/`scrape-all` write one file per competition into `./output`;
 pass `--combined` to write a single CSV/JSON file.
 
+The `--force` flag bypasses the cache and re-scrapes all competitions, even if
+HTML hasn't changed. Without this flag, the scraper uses incremental updates
+(caches table HTML and skips parsing if unchanged).
+
 In the TUI, output defaults to `./output`; you can change it under Settings.
 Per-competition output is the default; change it under Settings. You can also
-choose CSV or JSON output in Settings.
+choose CSV or JSON output in Settings. Force mode can be toggled with 'f' in
+the scrape selection screen.
 
 ## Requirements
 
@@ -109,8 +115,12 @@ You can run the binary directly:
 
 1. **Discovery** uses Puppeteer to load the SVNL archive page and click "Load more" buttons
 2. **Scraping** uses simple HTTP fetch (SVNL pages don't need JavaScript)
-3. **Parsing** extracts lifter data from HTML tables
-4. **Export** outputs results to CSV or JSON
+3. **Caching** extracts and caches table HTML with SHA-256 hash comparison (skips parsing if unchanged)
+4. **Parsing** extracts lifter data from HTML tables
+5. **Export** outputs results to CSV or JSON
+
+Cached HTML is stored in `~/.svnl-scraper/html/` with only the relevant table data
+(~90% storage savings vs full HTML). Use `--force` to bypass the cache.
 
 ## CSV Fields (selected)
 
@@ -142,7 +152,9 @@ src/
   tui.tsx       # TUI entry point (Ink)
   scraper.ts    # Discovery + scraping logic
   parser.ts     # SVNL HTML table parser
+  cache.ts      # HTML caching with hash comparison
   output.ts     # CSV/JSON export
+  log.ts        # JSON lines logging
   types.ts      # TypeScript interfaces
 SVNLScraper/
   SVNLScraper.xcodeproj

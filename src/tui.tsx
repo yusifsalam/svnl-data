@@ -27,6 +27,7 @@ function App() {
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [scrapeSelection, setScrapeSelection] = useState<Competition[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [forceMode, setForceMode] = useState(false);
   const [outputMode, setOutputMode] = useState<OutputMode>("per-competition");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
   const [outputDir, setOutputDir] = useState("./output");
@@ -164,6 +165,7 @@ function App() {
         <ScrapeSelectView
           competitions={competitions}
           selectedIds={selectedIds}
+          forceMode={forceMode}
           onToggle={(id) => {
             const next = new Set(selectedIds);
             if (next.has(id)) {
@@ -173,6 +175,7 @@ function App() {
             }
             setSelectedIds(next);
           }}
+          onToggleForce={() => setForceMode(!forceMode)}
           onStart={() => {
             const selected = competitions.filter((c) => selectedIds.has(c.id));
             setScrapeSelection(selected);
@@ -186,6 +189,7 @@ function App() {
       {screen === "scraping" && (
         <ScrapingView
           competitions={scrapeSelection}
+          forceMode={forceMode}
           progress={progress}
           onProgress={setProgress}
           onComplete={async (results) => {
@@ -227,11 +231,15 @@ function App() {
                   combined: outputMode === "combined",
                   format: outputFormat,
                   outputDir,
+                  forced: forceMode,
+                  skipped: results.filter((r) => r.metadata?.skipped).length,
+                  scraped: results.filter((r) => !r.metadata?.skipped).length,
                 },
               },
               logDir,
             );
             setSelectedIds(new Set());
+            setForceMode(false);
             setTimeout(() => {
               setScrapeSelection([]);
               setScrapeStartedAt(null);
@@ -501,13 +509,17 @@ function ListView({
 function ScrapeSelectView({
   competitions,
   selectedIds,
+  forceMode,
   onToggle,
+  onToggleForce,
   onStart,
   onBack,
 }: {
   competitions: Competition[];
   selectedIds: Set<string>;
+  forceMode: boolean;
   onToggle: (id: string) => void;
+  onToggleForce: () => void;
   onStart: () => void;
   onBack: () => void;
 }) {
@@ -539,6 +551,9 @@ function ScrapeSelectView({
         onToggle(competitions[idx].id);
       }
     }
+    if (input === "f") {
+      onToggleForce();
+    }
     if (key.return && selectedIds.size > 0) {
       onStart();
     }
@@ -552,6 +567,12 @@ function ScrapeSelectView({
       <Text bold>
         Select competitions to scrape ({selectedIds.size} selected)
       </Text>
+      <Box marginTop={1}>
+        <Text>
+          Force mode: {forceMode ? <Text color="yellow">ON</Text> : <Text color="gray">OFF</Text>}
+        </Text>
+        <Text color="gray"> (bypass cache)</Text>
+      </Box>
       <Box marginTop={1} flexDirection="column">
         {visible.map((comp, i) => {
           const isSelected = selectedIds.has(comp.id);
@@ -572,7 +593,7 @@ function ScrapeSelectView({
       </Box>
       <Box marginTop={1}>
         <Text color="gray">
-          Space to toggle, Enter to start, ←/→ pages, Escape to cancel
+          Space to toggle, F for force mode, Enter to start, ←/→ pages, Esc to cancel
         </Text>
       </Box>
     </Box>
@@ -581,12 +602,14 @@ function ScrapeSelectView({
 
 function ScrapingView({
   competitions,
+  forceMode,
   progress,
   onProgress,
   onComplete,
   onError,
 }: {
   competitions: Competition[];
+  forceMode: boolean;
   progress: string;
   onProgress: (msg: string) => void;
   onComplete: (results: CompetitionResult[]) => void;
@@ -597,7 +620,7 @@ function ScrapingView({
   useEffect(() => {
     if (!started) {
       setStarted(true);
-      scrapeCompetitions(competitions, { onProgress })
+      scrapeCompetitions(competitions, { onProgress, force: forceMode })
         .then(onComplete)
         .catch((e) => onError(e instanceof Error ? e.message : String(e)));
     }

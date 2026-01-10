@@ -121,6 +121,7 @@ program
   .description("Scrape specific competitions by ID")
   .option("-o, --output <dir>", "Output directory", "./output")
   .option("-f, --format <type>", "Output format (csv|json)", "csv")
+  .option("--force", "Force re-scrape (bypass cache)")
   .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--combined", "Write all competitions into one file")
   .option("--json", "Output JSON events (for SwiftUI)")
@@ -163,6 +164,7 @@ program
             console.log(chalk.gray(msg));
           }
         },
+        force: opts.force,
       });
 
       const timestamp = Date.now();
@@ -198,6 +200,9 @@ program
             combined: Boolean(opts.combined),
             format: opts.format,
             outputDir,
+            forced: Boolean(opts.force),
+            skipped: results.filter((r) => r.metadata?.skipped).length,
+            scraped: results.filter((r) => !r.metadata?.skipped).length,
           },
         },
         logDir,
@@ -244,6 +249,7 @@ program
   .description("Scrape all cached competitions")
   .option("-o, --output <dir>", "Output directory", "./output")
   .option("-f, --format <type>", "Output format (csv|json)", "csv")
+  .option("--force", "Force re-scrape (bypass cache)")
   .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--combined", "Write all competitions into one file")
   .option("--json", "Output JSON events (for SwiftUI)")
@@ -280,6 +286,7 @@ program
             console.log(chalk.gray(msg));
           }
         },
+        force: opts.force,
       });
 
       const timestamp = Date.now();
@@ -315,6 +322,9 @@ program
             combined: Boolean(opts.combined),
             format: opts.format,
             outputDir,
+            forced: Boolean(opts.force),
+            skipped: results.filter((r) => r.metadata?.skipped).length,
+            scraped: results.filter((r) => !r.metadata?.skipped).length,
           },
         },
         logDir,

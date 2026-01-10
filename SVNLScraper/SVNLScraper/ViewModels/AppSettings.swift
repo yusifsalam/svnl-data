@@ -38,6 +38,12 @@ final class AppSettings: ObservableObject {
             save()
         }
     }
+    @Published var forceMode: Bool {
+        didSet {
+            guard !isLoading else { return }
+            save()
+        }
+    }
 
     private let defaults = UserDefaults.standard
     private var isNormalizingOutput = false
@@ -51,6 +57,7 @@ final class AppSettings: ObservableObject {
         static let headlessMode = "svnl.headlessMode"
         static let chromePath = "svnl.chromePath"
         static let discoverPages = "svnl.discoverPages"
+        static let forceMode = "svnl.forceMode"
     }
 
     init() {
@@ -79,6 +86,11 @@ final class AppSettings: ObservableObject {
         chromePath = defaults.string(forKey: Keys.chromePath) ?? ""
         let pages = defaults.integer(forKey: Keys.discoverPages)
         discoverPages = pages > 0 ? pages : 5
+        if defaults.object(forKey: Keys.forceMode) == nil {
+            forceMode = false
+        } else {
+            forceMode = defaults.bool(forKey: Keys.forceMode)
+        }
         isLoading = false
     }
 
@@ -88,7 +100,8 @@ final class AppSettings: ObservableObject {
             logDir: logDir.isEmpty ? nil : logDir,
             headless: headlessMode,
             chromePath: chromePath.isEmpty ? nil : chromePath,
-            combinedOutput: combinedOutput
+            combinedOutput: combinedOutput,
+            force: forceMode
         )
     }
 
@@ -107,6 +120,7 @@ final class AppSettings: ObservableObject {
         defaults.set(headlessMode, forKey: Keys.headlessMode)
         defaults.set(chromePath, forKey: Keys.chromePath)
         defaults.set(discoverPages, forKey: Keys.discoverPages)
+        defaults.set(forceMode, forKey: Keys.forceMode)
     }
 
     private func normalizeOutputDir() {

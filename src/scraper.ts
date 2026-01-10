@@ -1,6 +1,13 @@
 import puppeteer from "puppeteer-core";
 import { parseCompetitionPage } from "./parser";
 import type { Competition, CompetitionResult, ProgressCallback } from "./types";
+import {
+  extractCompetitionTables,
+  computeHash,
+  readHtmlCache,
+  writeHtmlCache,
+  shouldScrape as shouldScrapeCheck,
+} from "./cache";
 
 const SVNL_ARCHIVE_URL =
   "https://www.suomenvoimanostoliitto.fi/kilpailut/tulosarkisto/";
@@ -13,6 +20,8 @@ interface DiscoverOptions {
 
 interface ScrapeOptions {
   onProgress?: ProgressCallback;
+  force?: boolean;
+  useCache?: boolean;
 }
 
 /**
@@ -153,7 +162,7 @@ export async function scrapeCompetition(
   competition: Competition,
   options: ScrapeOptions = {},
 ): Promise<CompetitionResult[]> {
-  const { onProgress } = options;
+  const { onProgress, force = false, useCache = true } = options;
 
   onProgress?.(`Fetching ${competition.name || competition.id}...`);
 
@@ -165,15 +174,54 @@ export async function scrapeCompetition(
   }
 
   const html = await response.text();
-  onProgress?.("Parsing results...");
 
-  const result = parseCompetitionPage(html, competition);
+  let tableHtml: string;
+  let skipped = false;
+  let usedCache = false;
+
+  try {
+    tableHtml = extractCompetitionTables(html);
+
+    if (useCache && !force) {
+      const decision = await shouldScrapeCheck(competition.id, tableHtml);
+
+      if (!decision.shouldScrape) {
+        const cachedHtml = await readHtmlCache(competition.id);
+        if (cachedHtml) {
+          onProgress?.("✓ Skipped (unchanged)");
+          tableHtml = cachedHtml;
+          skipped = true;
+          usedCache = true;
+        }
+      }
+    }
+
+    if (!skipped) {
+      const hash = computeHash(tableHtml);
+      await writeHtmlCache(competition.id, tableHtml, hash);
+      onProgress?.("Parsing results...");
+    }
+  } catch (error) {
+    onProgress?.(`Warning: Cache error, parsing full HTML`);
+    tableHtml = html;
+  }
+
+  const result = parseCompetitionPage(tableHtml, competition);
 
   const lifterCount = result.reduce(
     (sum, entry) => sum + entry.lifters.length,
     0,
   );
   onProgress?.(`Found ${lifterCount} lifters`);
+
+  result.forEach((r) => {
+    r.metadata = {
+      competitionId: competition.id,
+      skipped,
+      cached: usedCache,
+      hashMatch: skipped,
+    };
+  });
 
   return result;
 }
@@ -185,18 +233,31 @@ export async function scrapeCompetitions(
   competitions: Competition[],
   options: ScrapeOptions & { delayMs?: number } = {},
 ): Promise<CompetitionResult[]> {
-  const { onProgress, delayMs = 2000 } = options;
+  const { onProgress, delayMs = 2000, force = false } = options;
   const results: CompetitionResult[] = [];
+  let skippedCount = 0;
+  let scrapedCount = 0;
 
   for (let i = 0; i < competitions.length; i++) {
     const comp = competitions[i];
+    const prefix = `[${i + 1}/${competitions.length}]`;
+
     onProgress?.(
-      `[${i + 1}/${competitions.length}] Scraping ${comp.name || comp.id}`,
+      force
+        ? `${prefix} Re-scraping ${comp.name || comp.id} (forced)`
+        : `${prefix} Checking ${comp.name || comp.id}`,
     );
 
     try {
-      const result = await scrapeCompetition(comp, { onProgress });
+      const result = await scrapeCompetition(comp, { onProgress, force });
       results.push(...result);
+
+      const metadata = result[0]?.metadata;
+      if (metadata?.skipped) {
+        skippedCount++;
+      } else {
+        scrapedCount++;
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       onProgress?.(`Error: ${msg}`);
@@ -206,6 +267,12 @@ export async function scrapeCompetitions(
     if (i < competitions.length - 1) {
       await new Promise((r) => setTimeout(r, delayMs));
     }
+  }
+
+  if (!force && (skippedCount > 0 || scrapedCount > 0)) {
+    onProgress?.(
+      `Summary: ${scrapedCount} scraped, ${skippedCount} skipped (unchanged)`,
+    );
   }
 
   return results;

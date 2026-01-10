@@ -7,19 +7,22 @@ public final class CliService {
         public let headless: Bool
         public let chromePath: String?
         public let combinedOutput: Bool
+        public let force: Bool
 
         public init(
             outputDir: String? = nil,
             logDir: String? = nil,
             headless: Bool = true,
             chromePath: String? = nil,
-            combinedOutput: Bool = false
+            combinedOutput: Bool = false,
+            force: Bool = false
         ) {
             self.outputDir = outputDir
             self.logDir = logDir
             self.headless = headless
             self.chromePath = chromePath
             self.combinedOutput = combinedOutput
+            self.force = force
         }
     }
 
@@ -196,6 +199,9 @@ public final class CliService {
         }
         if config.combinedOutput {
             args.append("--combined")
+        }
+        if config.force {
+            args.append("--force")
         }
         args.append(contentsOf: ids)
         try runJSONCommand(

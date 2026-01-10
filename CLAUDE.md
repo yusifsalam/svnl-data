@@ -9,6 +9,7 @@ A powerlifting competition data scraper for Suomen Voimanostoliitto (SVNL - Finn
 **Key features:**
 - CLI for automation and SwiftUI app integration
 - TUI for interactive terminal use
+- Incremental updates with HTML caching (skips unchanged competitions)
 - Scrapes competition results (lifters, attempts, totals)
 - Exports to CSV and JSON
 
@@ -16,10 +17,12 @@ A powerlifting competition data scraper for Suomen Voimanostoliitto (SVNL - Finn
 
 ```bash
 # Run CLI
-bun run cli discover           # Discover competitions from SVNL archive
-bun run cli list               # List cached competitions
-bun run cli scrape <ids...>    # Scrape specific competitions
-bun run cli scrape-all         # Scrape all cached competitions
+bun run cli discover                    # Discover competitions from SVNL archive
+bun run cli list                        # List cached competitions
+bun run cli scrape <ids...>             # Scrape specific competitions
+bun run cli scrape <ids...> --force     # Force re-scrape (bypass cache)
+bun run cli scrape-all                  # Scrape all cached competitions
+bun run cli scrape-all --force          # Force re-scrape all (bypass cache)
 
 # Run TUI
 bun run tui
@@ -33,7 +36,7 @@ bun test
 
 ## Architecture
 
-Simple 7-file structure:
+Simple 8-file structure:
 
 ```
 src/
@@ -41,6 +44,7 @@ src/
   tui.tsx       # TUI entry point using Ink (React)
   scraper.ts    # Discovery (Puppeteer) + scraping (fetch)
   parser.ts     # SVNL HTML table parser
+  cache.ts      # HTML caching with hash comparison
   output.ts     # CSV/JSON export
   log.ts        # JSON lines logging utility
   types.ts      # TypeScript interfaces
@@ -50,13 +54,21 @@ src/
 
 1. **Discovery uses Puppeteer** - SVNL archive has "Load more" buttons
 2. **Scraping uses fetch** - Competition pages are static HTML (no JS needed)
-3. **Single source** - Only SVNL, no abstraction layers
-4. **Minimal dependencies** - No caching system, no config files
+3. **Incremental updates** - Caches table HTML with SHA-256 hash comparison, skips parsing if unchanged
+4. **Table-only caching** - Stores only relevant `<table>` elements (~90% storage savings vs full HTML)
+5. **Single source** - Only SVNL, no abstraction layers
+6. **Minimal dependencies** - Lightweight caching using filesystem, no config files
 
 ### Data Flow
 
 ```
-SVNL Archive → Puppeteer → Competition URLs → fetch → HTML → parser → Lifter Data → CSV/JSON
+SVNL Archive → Puppeteer → Competition URLs → fetch → Extract tables → Hash check
+                                                            ↓             ↓
+                                                      ~/.svnl-scraper/html/
+                                                            ↓
+                                                    Parse (if changed) or skip
+                                                            ↓
+                                                      Lifter Data → CSV/JSON
 ```
 
 ## Code Style

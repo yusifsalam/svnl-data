@@ -115,6 +115,28 @@ struct SettingsView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 16) {
+                        Label("Scraping", systemImage: "arrow.down.circle")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Force Mode")
+                                    .font(.subheadline.bold())
+                                Text("Bypass cache and re-scrape all competitions")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Toggle("", isOn: $settings.forceMode)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+                        .padding()
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    VStack(alignment: .leading, spacing: 16) {
                         Label("Browser", systemImage: "safari")
                             .font(.headline)
                             .foregroundStyle(.secondary)
