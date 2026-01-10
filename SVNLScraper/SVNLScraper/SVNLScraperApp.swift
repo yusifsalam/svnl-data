@@ -30,6 +30,12 @@ struct SVNLScraperApp: App {
         }
         .defaultSize(width: 900, height: 520)
 
+        Window("Competition Preview", id: "competition-preview") {
+            CompetitionPreviewView(settings: settings)
+                .modelContainer(modelContainer)
+        }
+        .defaultSize(width: 1100, height: 720)
+
         Window("Scrape History", id: "scrape-history") {
             HistoryView()
                 .modelContainer(modelContainer)

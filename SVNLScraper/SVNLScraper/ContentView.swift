@@ -69,6 +69,13 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
 
                 Button {
+                    openWindow(id: "competition-preview")
+                } label: {
+                    Label("Competition Preview", systemImage: "list.bullet.rectangle")
+                }
+                .buttonStyle(.bordered)
+
+                Button {
                     openWindow(id: "scrape-history")
                 } label: {
                     Label("History", systemImage: "clock.arrow.circlepath")
