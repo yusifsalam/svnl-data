@@ -131,6 +131,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		F9E415302F00123400572A79 /* Build CLI */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -142,7 +143,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\nif [ \"$CONFIGURATION\" != \"Release\" ]; then\n  echo \"Skipping CLI build for $CONFIGURATION\"\n  exit 0\nfi\n\nexport PATH=\"$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\n\nif ! command -v bun >/dev/null 2>&1; then\n  echo \"warning: bun not found, skipping CLI build\"\n  exit 0\nfi\n\nROOT_DIR=\"$SRCROOT/..\"\nOUTPUT_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n\ncd \"$ROOT_DIR\"\nmkdir -p \"$ROOT_DIR/dist\"\nbun run build:cli\n\nif [ ! -f \"$ROOT_DIR/dist/svnl-cli\" ]; then\n  echo \"error: CLI build output not found at $ROOT_DIR/dist/svnl-cli\"\n  exit 1\nfi\n\nmkdir -p \"$OUTPUT_DIR\"\ncp \"$ROOT_DIR/dist/svnl-cli\" \"$OUTPUT_DIR/svnl-cli\"\nchmod +x \"$OUTPUT_DIR/svnl-cli\"\necho \"Bundled CLI: $OUTPUT_DIR/svnl-cli\"\n";
+			shellScript = "set -e\n\nif [ \"$CONFIGURATION\" != \"Release\" ]; then\n  echo \"Skipping CLI build for $CONFIGURATION\"\n  exit 0\nfi\n\nexport PATH=\"$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\n\nif ! command -v bun >/dev/null 2>&1; then\n  echo \"warning: bun not found, skipping CLI build\"\n  exit 0\nfi\n\nROOT_DIR=\"$SRCROOT/..\"\nOUTPUT_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\n\ncd \"$ROOT_DIR\"\nmkdir -p \"$ROOT_DIR/dist\"\nbun run build:cli\n\nif [ ! -f \"$ROOT_DIR/dist/svnl-cli\" ]; then\n  echo \"error: CLI build output not found at $ROOT_DIR/dist/svnl-cli\"\n  exit 1\nfi\n\nmkdir -p \"$OUTPUT_DIR\"\nrm -f \"$OUTPUT_DIR/svnl-cli\"\ncp \"$ROOT_DIR/dist/svnl-cli\" \"$OUTPUT_DIR/svnl-cli\"\nchmod +x \"$OUTPUT_DIR/svnl-cli\"\necho \"Bundled CLI: $OUTPUT_DIR/svnl-cli\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

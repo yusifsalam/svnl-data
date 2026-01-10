@@ -159,6 +159,10 @@ struct CompetitionPreviewView: View {
                             }
                         }
 
+                        let benchOnly = isBenchOnly(
+                            competition.eventType,
+                            lifters: competition.lifters
+                        )
                         Table(competition.lifters) {
                             TableColumn("#") { lifter in
                                 Text(lifter.position)
@@ -193,20 +197,27 @@ struct CompetitionPreviewView: View {
                             }
                             .width(60)
 
-                            TableColumn("Squat") { lifter in
-                                attemptsStack(lifter.squat)
-                            }
-                            .width(min: 120, ideal: 150)
+                            if !benchOnly {
+                                TableColumn("Squat") { lifter in
+                                    attemptsStack(lifter.squat)
+                                }
+                                .width(min: 120, ideal: 150)
 
-                            TableColumn("Bench") { lifter in
-                                attemptsStack(lifter.bench)
-                            }
-                            .width(min: 120, ideal: 150)
+                                TableColumn("Bench") { lifter in
+                                    attemptsStack(lifter.bench)
+                                }
+                                .width(min: 120, ideal: 150)
 
-                            TableColumn("Deadlift") { lifter in
-                                attemptsStack(lifter.deadlift)
+                                TableColumn("Deadlift") { lifter in
+                                    attemptsStack(lifter.deadlift)
+                                }
+                                .width(min: 120, ideal: 150)
+                            } else {
+                                TableColumn("Bench") { lifter in
+                                    attemptsStack(lifter.bench)
+                                }
+                                .width(min: 120, ideal: 150)
                             }
-                            .width(min: 120, ideal: 150)
 
                             TableColumn("Total") { lifter in
                                 Text(lifter.total)
@@ -245,6 +256,35 @@ struct CompetitionPreviewView: View {
             return "\(attempt.weight)x"
         }
         return attempt.weight
+    }
+
+    private func isBenchOnly(
+        _ eventType: String,
+        lifters: [CompetitionPreviewViewModel.PreviewLifter]
+    ) -> Bool {
+        let normalized = eventType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized == "b" || normalized == "bench" {
+            return true
+        }
+        let hasSquat = lifters.contains { lifter in
+            lifter.squat.contains { !isEmptyWeight($0.weight) }
+        }
+        let hasDeadlift = lifters.contains { lifter in
+            lifter.deadlift.contains { !isEmptyWeight($0.weight) }
+        }
+        return !hasSquat && !hasDeadlift
+    }
+
+    private func isEmptyWeight(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return true
+        }
+        let normalized = trimmed.replacingOccurrences(of: ",", with: ".")
+        if let number = Double(normalized), number <= 0 {
+            return true
+        }
+        return false
     }
 
     private var selectedCompetition: CompetitionPreviewViewModel.PreviewCompetition? {

@@ -405,6 +405,15 @@ function parseLifters(doc: Document): Lifter[] {
         const numeric = weightClassMatch[1];
         const plus = weightClassMatch[2] ? "+" : "";
         weightClass = plus ? `${numeric}+` : `-${numeric}`;
+      } else {
+        const prefixedMatch = weightClassText.match(
+          /^[MN]\s*(\d+(?:\.\d+)?)(\+)?/i,
+        );
+        if (prefixedMatch) {
+          const numeric = prefixedMatch[1];
+          const plus = prefixedMatch[2] ? "+" : "";
+          weightClass = plus ? `${numeric}+` : `-${numeric}`;
+        }
       }
       const ageClass = ageClassFromCell || currentAgeClassHeader || undefined;
 
@@ -485,19 +494,19 @@ function detectColumnMap(row: Element, subHeaderRow?: Element): ColumnMap {
     }
     if (text.includes("seura")) columnMap.club = index;
 
-    if (text.includes("jalkakyykky") || text === "jk") {
+    if (text.includes("jalkakyykky") || text.startsWith("jk")) {
       if (columnMap.squatStart === undefined) {
         columnMap.squatStart = numberedAttemptStart(headerTexts, index);
       }
     }
 
-    if (text.includes("penkkipunnerrus") || text === "pp") {
+    if (text.includes("penkkipunnerrus") || text.startsWith("pp")) {
       if (columnMap.benchStart === undefined) {
         columnMap.benchStart = numberedAttemptStart(headerTexts, index);
       }
     }
 
-    if (text.includes("maastanosto") || text === "mn") {
+    if (text.includes("maastanosto") || text.startsWith("mn")) {
       if (columnMap.deadliftStart === undefined) {
         columnMap.deadliftStart = numberedAttemptStart(headerTexts, index);
       }
@@ -510,24 +519,30 @@ function detectColumnMap(row: Element, subHeaderRow?: Element): ColumnMap {
   });
 
   if (subHeaderTexts) {
-    const squatHeaderIndex = headerTexts.findIndex((text) =>
-      text.includes("jalkakyykky"),
+    const squatHeaderIndex = headerTexts.findIndex(
+      (text) => text.includes("jalkakyykky") || text.startsWith("jk"),
     );
-    const benchHeaderIndex = headerTexts.findIndex((text) =>
-      text.includes("penkkipunnerrus"),
+    const benchHeaderIndex = headerTexts.findIndex(
+      (text) => text.includes("penkkipunnerrus") || text.startsWith("pp"),
     );
-    const deadliftHeaderIndex = headerTexts.findIndex((text) =>
-      text.includes("maastanosto"),
+    const deadliftHeaderIndex = headerTexts.findIndex(
+      (text) => text.includes("maastanosto") || text.startsWith("mn"),
     );
-    const squatStart = findNextAttemptStart(subHeaderTexts, squatHeaderIndex);
-    const benchStart = findNextAttemptStart(subHeaderTexts, benchHeaderIndex);
-    const deadliftStart = findNextAttemptStart(
-      subHeaderTexts,
-      deadliftHeaderIndex,
-    );
-    if (squatStart !== undefined) columnMap.squatStart = squatStart;
-    if (benchStart !== undefined) columnMap.benchStart = benchStart;
-    if (deadliftStart !== undefined) columnMap.deadliftStart = deadliftStart;
+    if (squatHeaderIndex >= 0) {
+      const squatStart = findNextAttemptStart(subHeaderTexts, squatHeaderIndex);
+      if (squatStart !== undefined) columnMap.squatStart = squatStart;
+    }
+    if (benchHeaderIndex >= 0) {
+      const benchStart = findNextAttemptStart(subHeaderTexts, benchHeaderIndex);
+      if (benchStart !== undefined) columnMap.benchStart = benchStart;
+    }
+    if (deadliftHeaderIndex >= 0) {
+      const deadliftStart = findNextAttemptStart(
+        subHeaderTexts,
+        deadliftHeaderIndex,
+      );
+      if (deadliftStart !== undefined) columnMap.deadliftStart = deadliftStart;
+    }
 
     const pointsIndex = subHeaderTexts.findIndex(
       (text) =>
@@ -568,6 +583,20 @@ function detectColumnMap(row: Element, subHeaderRow?: Element): ColumnMap {
         }
       }
     }
+  }
+
+  const hasSquatHeader = headerTexts.some((text) =>
+    text.includes("jalkakyykky"),
+  );
+  const hasDeadliftHeader = headerTexts.some((text) =>
+    text.includes("maastanosto"),
+  );
+  const hasBenchHeader = headerTexts.some((text) =>
+    text.includes("penkkipunnerrus"),
+  );
+  if (hasBenchHeader && !hasSquatHeader && !hasDeadliftHeader) {
+    columnMap.squatStart = undefined;
+    columnMap.deadliftStart = undefined;
   }
 
   return columnMap;
@@ -634,9 +663,9 @@ function isHeaderRow(row: Element): boolean {
         text.includes("jalkakyykky") ||
         text.includes("penkkipunnerrus") ||
         text.includes("maastanosto") ||
-        text === "jk" ||
-        text === "pp" ||
-        text === "mn",
+        text.startsWith("jk") ||
+        text.startsWith("pp") ||
+        text.startsWith("mn"),
     )
   ) {
     return true;
@@ -723,7 +752,7 @@ function extractEquipmentLabel(text: string): "raw" | "equipped" | null {
 
 function extractAgeClassFromText(text: string): string | null {
   const trimmed = text.replace(/\s+/g, " ").trim().toUpperCase();
-  const match = trimmed.match(/([NM]\d{2})/);
+  const match = trimmed.match(/([NM](?:14|18|23|40|50|60|70))/);
   return match ? match[1] : null;
 }
 
