@@ -28,6 +28,9 @@ bun run cli scrape svnl-pv-81 svnl-sm-2024
 
 # Launch interactive TUI
 bun run tui
+
+# Build standalone CLI binary
+bun run build:cli
 ```
 
 ## CLI Commands
@@ -58,6 +61,16 @@ choose CSV or JSON output in Settings.
 
 - **Bun** - JavaScript runtime
 - **Chrome/Chromium** - Required for discovery (clicking "Load more" buttons)
+
+## Build a Standalone CLI
+
+Compile the CLI into a single executable for embedding or distribution:
+
+```bash
+bun run build:cli
+```
+
+The output binary is written to `dist/svnl`.
 
 ## How It Works
 

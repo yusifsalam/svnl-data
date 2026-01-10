@@ -6,6 +6,7 @@
   "scripts": {
     "cli": "bun run src/cli.ts",
     "tui": "bun run src/tui.tsx",
+    "build:cli": "bun build src/cli.ts --compile --outfile dist/svnl",
     "test": "bun test"
   },
   "dependencies": {
