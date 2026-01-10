@@ -20,6 +20,7 @@ const SETTINGS_FILE = join(DATA_DIR, "settings.json");
 
 type Screen = "menu" | "discover" | "list" | "scrape" | "scraping" | "settings";
 type OutputMode = "per-competition" | "combined";
+type OutputFormat = "csv" | "json";
 
 function App() {
   const { exit } = useApp();
@@ -28,6 +29,7 @@ function App() {
   const [scrapeSelection, setScrapeSelection] = useState<Competition[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [outputMode, setOutputMode] = useState<OutputMode>("per-competition");
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
   const [outputDir, setOutputDir] = useState("./output");
   const [logDir, setLogDir] = useState("./logs");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -59,6 +61,9 @@ function App() {
       if (data.outputMode === "per-competition" || data.outputMode === "combined") {
         setOutputMode(data.outputMode);
       }
+      if (data.outputFormat === "csv" || data.outputFormat === "json") {
+        setOutputFormat(data.outputFormat);
+      }
       if (typeof data.outputDir === "string" && data.outputDir.trim()) {
         setOutputDir(data.outputDir);
       }
@@ -73,14 +78,14 @@ function App() {
     await mkdir(DATA_DIR, { recursive: true });
     await writeFile(
       SETTINGS_FILE,
-      JSON.stringify({ outputMode, outputDir, logDir }, null, 2),
+      JSON.stringify({ outputMode, outputFormat, outputDir, logDir }, null, 2),
     );
   }
 
   useEffect(() => {
     if (!settingsLoaded) return;
     saveSettings();
-  }, [outputMode, outputDir, logDir, settingsLoaded]);
+  }, [outputMode, outputFormat, outputDir, logDir, settingsLoaded]);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -184,15 +189,18 @@ function App() {
             const logPath = join(logDir, "svnl-log.jsonl");
             if (outputMode === "combined") {
               setProgress("Saving file...");
-              const path = join(outputDir, `results_${Date.now()}.csv`);
-              await writeResults(results, path, "csv");
+              const path = join(
+                outputDir,
+                `results_${Date.now()}.${outputFormat}`,
+              );
+              await writeResults(results, path, outputFormat);
               setProgress(`Saved to ${path} | Log: ${logPath}`);
             } else {
               setProgress("Saving files...");
               const outputPaths = await writeResultsPerCompetition(
                 results,
                 outputDir,
-                "csv",
+                outputFormat,
               );
               setProgress(
                 `Saved ${outputPaths.length} files to ${outputDir} | Log: ${logPath}`,
@@ -211,11 +219,11 @@ function App() {
                 ),
                 competitionIds: results.map((result) => result.competition.id),
                 combined: outputMode === "combined",
-                format: "csv",
+                format: outputFormat,
                 outputDir,
               },
-          },
-              logDir,
+            },
+            logDir,
           );
             setSelectedIds(new Set());
             setTimeout(() => {
@@ -235,6 +243,8 @@ function App() {
         <SettingsView
           outputMode={outputMode}
           onChange={(mode) => setOutputMode(mode)}
+          outputFormat={outputFormat}
+          onFormatChange={(format) => setOutputFormat(format)}
           outputDir={outputDir}
           onOutputDirChange={(dir) => setOutputDir(dir)}
           logDir={logDir}
@@ -272,6 +282,8 @@ function MainMenu({ onSelect }: { onSelect: (action: string) => void }) {
 function SettingsView({
   outputMode,
   onChange,
+  outputFormat,
+  onFormatChange,
   outputDir,
   onOutputDirChange,
   logDir,
@@ -280,6 +292,8 @@ function SettingsView({
 }: {
   outputMode: OutputMode;
   onChange: (mode: OutputMode) => void;
+  outputFormat: OutputFormat;
+  onFormatChange: (format: OutputFormat) => void;
   outputDir: string;
   onOutputDirChange: (dir: string) => void;
   logDir: string;
@@ -337,6 +351,14 @@ function SettingsView({
       value: "combined",
     },
     {
+      label: `${outputFormat === "csv" ? "●" : "○"} Format: csv`,
+      value: "format-csv",
+    },
+    {
+      label: `${outputFormat === "json" ? "●" : "○"} Format: json`,
+      value: "format-json",
+    },
+    {
       label: `Output directory: ${outputDir}`,
       value: "output-dir",
     },
@@ -374,6 +396,12 @@ function SettingsView({
               } else if (item.value === "log-dir") {
                 setDirInput("");
                 setEditingField("log");
+              } else if (item.value === "format-csv") {
+                onFormatChange("csv");
+                onBack();
+              } else if (item.value === "format-json") {
+                onFormatChange("json");
+                onBack();
               } else {
                 onChange(item.value as OutputMode);
                 onBack();
