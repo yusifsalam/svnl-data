@@ -1,5 +1,13 @@
 # SVNL Scraper
 
+<div align="center">
+    <br />
+    <br />
+    <img src="docs/logo.png" alt="SVNL Scraper logo" width="400" />
+    <br />
+    <br />
+</div>
+
 A powerlifting competition data scraper for [Suomen Voimanostoliitto](https://www.suomenvoimanostoliitto.fi/) (Finnish Powerlifting Federation). Extracts lifter results (attempts, totals, bodyweight, etc.) and exports to CSV or JSON.
 
 ## Features
