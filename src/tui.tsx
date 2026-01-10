@@ -163,10 +163,12 @@ function App() {
           onProgress={setProgress}
           onComplete={async (results) => {
             if (outputMode === "combined") {
+              setProgress("Saving file...");
               const path = join(outputDir, `results_${Date.now()}.csv`);
               await writeResults(results, path, "csv");
               setProgress(`Saved to ${path}`);
             } else {
+              setProgress("Saving files...");
               const outputPaths = await writeResultsPerCompetition(
                 results,
                 outputDir,
@@ -177,8 +179,10 @@ function App() {
               );
             }
             setSelectedIds(new Set());
-            setScrapeSelection([]);
-            setTimeout(() => setScreen("menu"), 3000);
+            setTimeout(() => {
+              setScrapeSelection([]);
+              setScreen("menu");
+            }, 3000);
           }}
           onError={(e) => {
             setError(e);
@@ -519,7 +523,11 @@ function ScrapingView({
         <Text color="green">
           <Spinner type="dots" />
         </Text>
-        <Text> Scraping {competitions.length} competitions...</Text>
+        <Text>
+          {progress.match(/^(Saving|Saved)/)
+            ? " Saving files..."
+            : ` Scraping ${competitions.length} competitions...`}
+        </Text>
       </Box>
       <Box marginTop={1}>
         <Text color="gray">{progress}</Text>
