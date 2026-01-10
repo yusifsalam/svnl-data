@@ -64,7 +64,6 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
   let category: "nationals" | "local" = competition.category || "local";
 
   if (parts.length >= 2) {
-    // Last part usually contains the date or location+date
     const lastPart = parts[parts.length - 1];
     date = lastPart;
     const dateOnly = extractDateFromText(lastPart);
@@ -73,10 +72,16 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
       const locationOnly = extractLocationFromText(lastPart, dateOnly);
       if (locationOnly) {
         location = locationOnly;
+      } else if (parts.length >= 3) {
+        location = parts[parts.length - 2];
       }
     }
-    // Name is everything except the date
-    name = parts.slice(0, -1).join(", ");
+    // Name is everything except date/location parts
+    const nameParts = parts.slice(0, -1);
+    if (location && nameParts.length > 0 && nameParts[nameParts.length - 1] === location) {
+      nameParts.pop();
+    }
+    name = nameParts.join(", ");
 
     // Detect category from title
     const lowerTitle = titleText.toLowerCase();
@@ -86,10 +91,6 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
   }
 
   date = cleanDate(date);
-
-  if (!location && parts.length >= 3) {
-    location = parts[parts.length - 2];
-  }
 
   if (!isLikelyDate(date)) {
     const timeEl = doc.querySelector("time");

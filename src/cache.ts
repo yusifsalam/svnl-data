@@ -33,7 +33,17 @@ export function extractCompetitionTables(html: string): string {
     throw new Error("No competition tables found in HTML");
   }
 
-  return relevantTables.join("\n");
+  const titleEl = document.querySelector("h1.entry-title, h1, title");
+  let titleHtml = "";
+  if (titleEl) {
+    if (titleEl.tagName.toLowerCase() === "title") {
+      titleHtml = `<h1>${titleEl.textContent}</h1>`;
+    } else {
+      titleHtml = titleEl.outerHTML;
+    }
+  }
+
+  return titleHtml + "\n" + relevantTables.join("\n");
 }
 
 export function computeHash(html: string): string {
