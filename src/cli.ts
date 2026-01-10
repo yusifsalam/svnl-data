@@ -124,6 +124,7 @@ program
   .option("--force", "Force re-scrape (bypass cache)")
   .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--combined", "Write all competitions into one file")
+  .option("--validate", "Show detailed validation warnings")
   .option("--json", "Output JSON events (for SwiftUI)")
   .action(async (ids: string[], opts) => {
     const isJson = opts.json;
@@ -208,6 +209,52 @@ program
         logDir,
       );
 
+      if (opts.validate && !isJson) {
+        let totalValidatedLifters = 0;
+        let totalLiftersWithWarnings = 0;
+        let totalWarnings = 0;
+
+        for (const result of results) {
+          const validation = result.metadata?.validation;
+          if (validation) {
+            totalValidatedLifters += validation.totalLifters;
+            totalLiftersWithWarnings += validation.liftersWithWarnings;
+            totalWarnings += validation.allWarnings.length;
+          }
+        }
+
+        if (totalLiftersWithWarnings === 0) {
+          console.log(
+            chalk.green(
+              `\n✓ Validation: ${totalValidatedLifters} lifters passed all checks`,
+            ),
+          );
+        } else {
+          console.log(
+            chalk.yellow(
+              `\n⚠ Validation: ${totalLiftersWithWarnings}/${totalValidatedLifters} lifters have warnings (${totalWarnings} total)`,
+            ),
+          );
+
+          for (const result of results) {
+            const validation = result.metadata?.validation;
+            if (validation && validation.allWarnings.length > 0) {
+              console.log(chalk.yellow(`\n  ${result.competition.name}:`));
+              for (const warning of validation.allWarnings.slice(0, 10)) {
+                console.log(chalk.gray(`    ${warning.message}`));
+              }
+              if (validation.allWarnings.length > 10) {
+                console.log(
+                  chalk.gray(
+                    `    ... and ${validation.allWarnings.length - 10} more`,
+                  ),
+                );
+              }
+            }
+          }
+        }
+      }
+
       if (isJson) {
         jsonEvent({
           type: "complete",
@@ -252,6 +299,7 @@ program
   .option("--force", "Force re-scrape (bypass cache)")
   .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--combined", "Write all competitions into one file")
+  .option("--validate", "Show detailed validation warnings")
   .option("--json", "Output JSON events (for SwiftUI)")
   .action(async (opts) => {
     const isJson = opts.json;
@@ -329,6 +377,52 @@ program
         },
         logDir,
       );
+
+      if (opts.validate && !isJson) {
+        let totalValidatedLifters = 0;
+        let totalLiftersWithWarnings = 0;
+        let totalWarnings = 0;
+
+        for (const result of results) {
+          const validation = result.metadata?.validation;
+          if (validation) {
+            totalValidatedLifters += validation.totalLifters;
+            totalLiftersWithWarnings += validation.liftersWithWarnings;
+            totalWarnings += validation.allWarnings.length;
+          }
+        }
+
+        if (totalLiftersWithWarnings === 0) {
+          console.log(
+            chalk.green(
+              `\n✓ Validation: ${totalValidatedLifters} lifters passed all checks`,
+            ),
+          );
+        } else {
+          console.log(
+            chalk.yellow(
+              `\n⚠ Validation: ${totalLiftersWithWarnings}/${totalValidatedLifters} lifters have warnings (${totalWarnings} total)`,
+            ),
+          );
+
+          for (const result of results) {
+            const validation = result.metadata?.validation;
+            if (validation && validation.allWarnings.length > 0) {
+              console.log(chalk.yellow(`\n  ${result.competition.name}:`));
+              for (const warning of validation.allWarnings.slice(0, 10)) {
+                console.log(chalk.gray(`    ${warning.message}`));
+              }
+              if (validation.allWarnings.length > 10) {
+                console.log(
+                  chalk.gray(
+                    `    ... and ${validation.allWarnings.length - 10} more`,
+                  ),
+                );
+              }
+            }
+          }
+        }
+      }
 
       if (isJson) {
         jsonEvent({

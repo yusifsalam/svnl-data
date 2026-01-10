@@ -8,6 +8,7 @@ import {
   writeHtmlCache,
   shouldScrape as shouldScrapeCheck,
 } from "./cache";
+import { validateCompetitionResult } from "./validate";
 
 const SVNL_ARCHIVE_URL =
   "https://www.suomenvoimanostoliitto.fi/kilpailut/tulosarkisto/";
@@ -215,12 +216,20 @@ export async function scrapeCompetition(
   onProgress?.(`Found ${lifterCount} lifters`);
 
   result.forEach((r) => {
+    const validation = validateCompetitionResult(r);
     r.metadata = {
       competitionId: competition.id,
       skipped,
       cached: usedCache,
       hashMatch: skipped,
+      validation,
     };
+
+    if (validation.liftersWithWarnings > 0) {
+      onProgress?.(
+        `⚠ ${validation.liftersWithWarnings}/${validation.totalLifters} lifters have warnings`,
+      );
+    }
   });
 
   return result;

@@ -32,11 +32,26 @@ export interface Lifter {
   position: number;
 }
 
+export interface ValidationSummary {
+  totalLifters: number;
+  liftersWithWarnings: number;
+  warningsByRule: Record<string, number>;
+  allWarnings: Array<{
+    severity: "warning";
+    rule: string;
+    message: string;
+    lifterName?: string;
+    competitionId?: string;
+    details?: Record<string, unknown>;
+  }>;
+}
+
 export interface ScrapeMetadata {
   competitionId: string;
   skipped: boolean;
   cached: boolean;
   hashMatch: boolean;
+  validation?: ValidationSummary;
 }
 
 export interface CompetitionResult {
