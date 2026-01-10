@@ -526,18 +526,27 @@ function detectColumnMap(row: Element, subHeaderRow?: Element): ColumnMap {
     const deadliftHeaderIndex = headerTexts.findIndex(
       (text) => text.includes("maastanosto") || text.startsWith("mn"),
     );
+
+    let lastAttemptEnd = 0;
+
     if (squatHeaderIndex >= 0) {
       const squatStart = findNextAttemptStart(subHeaderTexts, squatHeaderIndex);
-      if (squatStart !== undefined) columnMap.squatStart = squatStart;
+      if (squatStart !== undefined) {
+        columnMap.squatStart = squatStart;
+        lastAttemptEnd = squatStart + 4;
+      }
     }
     if (benchHeaderIndex >= 0) {
-      const benchStart = findNextAttemptStart(subHeaderTexts, benchHeaderIndex);
-      if (benchStart !== undefined) columnMap.benchStart = benchStart;
+      const benchStart = findNextAttemptStart(subHeaderTexts, Math.max(benchHeaderIndex, lastAttemptEnd));
+      if (benchStart !== undefined) {
+        columnMap.benchStart = benchStart;
+        lastAttemptEnd = benchStart + 4;
+      }
     }
     if (deadliftHeaderIndex >= 0) {
       const deadliftStart = findNextAttemptStart(
         subHeaderTexts,
-        deadliftHeaderIndex,
+        Math.max(deadliftHeaderIndex, lastAttemptEnd),
       );
       if (deadliftStart !== undefined) columnMap.deadliftStart = deadliftStart;
     }
