@@ -96,10 +96,6 @@ The `SVNLScraper/` folder contains a native macOS SwiftUI app that provides a GU
 {"type": "error", "message": "..."}
 ```
 
-## Legacy Code
-
-The `_legacy/` folder contains the old Deno-based implementation for reference.
-
 ## Environment Variables
 
 - `SVNL_BROWSER_PATH` - Path to Chrome/Chromium for discovery
