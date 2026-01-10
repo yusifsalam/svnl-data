@@ -7,6 +7,7 @@ A powerlifting competition data scraper for [Suomen Voimanostoliitto](https://ww
 - **CLI** - Command-line interface for scripting and automation
 - **TUI** - Interactive terminal UI with menus
 - **JSON Output** - Machine-readable output for app integration
+- **Per-competition output** - One file per competition by default (combined optional)
 
 ## Quick Start
 
@@ -47,12 +48,13 @@ bun run build:cli
 
 The app stores CSV/JSON output under `~/Documents/SVNLScraper` by default, and
 logs under `~/Documents/SVNLScraper/logs/svnl-log.jsonl`. Both can be changed
-in the app Settings.
+in the app Settings. Output format (CSV/JSON) and per-competition vs combined
+mode are also configurable there.
 
 ## CLI Commands
 
 ```bash
-# Discover competitions (clicks "Load more" 5 times by default)
+# Discover competitions (clicks "Load more" 0 times by default)
 bun run cli discover [--clicks <n>] [--browser <path>] [--log-dir <dir>] [--json]
 
 # List cached competitions
@@ -88,6 +90,13 @@ bun run build:cli
 
 The output binary is written to `dist/svnl-cli`.
 
+You can run the binary directly:
+
+```bash
+./dist/svnl-cli discover
+./dist/svnl-cli scrape svnl-pv-81
+```
+
 ## How It Works
 
 1. **Discovery** uses Puppeteer to load the SVNL archive page and click "Load more" buttons
@@ -105,7 +114,8 @@ The output binary is written to `dist/svnl-cli`.
 ## Logs
 
 Each operation appends a JSONL entry to `svnl-log.jsonl` with the operation
-name and duration in milliseconds.
+name and duration in milliseconds. Scrape operations include the competition
+IDs in the log details.
 
 - Logs default to `./logs` unless `--log-dir` is set
 - In the TUI, log output defaults to `./logs` and is configurable under Settings
