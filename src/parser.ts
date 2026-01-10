@@ -65,8 +65,12 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
   let category: "nationals" | "local" = competition.category || "local";
 
   if (parts.length >= 2) {
-    // Last part usually contains the date
+    // Last part usually contains the date or location+date
     date = parts[parts.length - 1];
+    const dateOnly = extractDateFromText(date);
+    if (dateOnly) {
+      date = dateOnly;
+    }
     // Name is everything except the date
     name = parts.slice(0, -1).join(", ");
 
@@ -113,6 +117,15 @@ function cleanDate(value: string): string {
   return value
     .replace(/\s+-\s+[A-Za-z\u00c4\u00d6\u00c5\u00e4\u00f6\u00e5\s]+$/i, "")
     .trim();
+}
+
+function extractDateFromText(value: string): string {
+  const cleaned = cleanDate(value);
+  const rangeMatch = cleaned.match(/(\d{1,2}\.\s*[–-]\s*\d{1,2}\.\d{1,2}\.\d{2,4})/);
+  if (rangeMatch) return rangeMatch[1];
+  const singleMatch = cleaned.match(/(\d{1,2}\.\d{1,2}\.\d{2,4})/);
+  if (singleMatch) return singleMatch[1];
+  return "";
 }
 
 function isLikelyDate(value: string): boolean {
