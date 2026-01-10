@@ -24,13 +24,16 @@ bun run cli scrape-all         # Scrape all cached competitions
 # Run TUI
 bun run tui
 
+# Build standalone CLI binary
+bun run build:cli
+
 # Run tests
 bun test
 ```
 
 ## Architecture
 
-Simple 6-file structure:
+Simple 7-file structure:
 
 ```
 src/
@@ -39,6 +42,7 @@ src/
   scraper.ts    # Discovery (Puppeteer) + scraping (fetch)
   parser.ts     # SVNL HTML table parser
   output.ts     # CSV/JSON export
+  log.ts        # JSON lines logging utility
   types.ts      # TypeScript interfaces
 ```
 
@@ -65,9 +69,9 @@ The parser handles SVNL table format variations:
 4. Parse lifter rows, skip division headers
 5. Throw clear error if table format unrecognized
 
-## SwiftUI Integration
+## SwiftUI App
 
-CLI supports `--json` flag for machine-readable output:
+The `SVNLScraper/` folder contains a native macOS SwiftUI app that provides a GUI for the scraper. It communicates with the CLI via `--json` output:
 
 ```json
 {"type": "progress", "message": "Loading..."}
