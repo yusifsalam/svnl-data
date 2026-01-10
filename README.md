@@ -51,7 +51,8 @@ By default, `scrape`/`scrape-all` write one file per competition into `./output`
 pass `--combined` to write a single CSV/JSON file.
 
 In the TUI, output defaults to `./output`; you can change it under Settings.
-Per-competition output is the default; change it under Settings.
+Per-competition output is the default; change it under Settings. You can also
+choose CSV or JSON output in Settings.
 
 ## Requirements
 
