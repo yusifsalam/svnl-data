@@ -7,6 +7,7 @@ export interface Competition {
   date: string;
   startDate?: string;
   endDate?: string;
+  location?: string;
   eventType?: "sbd" | "b";
   category: "nationals" | "local";
 }

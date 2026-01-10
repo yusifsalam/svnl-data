@@ -62,14 +62,20 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
 
   let name = titleText || competition.name || competition.id;
   let date = "";
+  let location = "";
   let category: "nationals" | "local" = competition.category || "local";
 
   if (parts.length >= 2) {
     // Last part usually contains the date or location+date
-    date = parts[parts.length - 1];
-    const dateOnly = extractDateFromText(date);
+    const lastPart = parts[parts.length - 1];
+    date = lastPart;
+    const dateOnly = extractDateFromText(lastPart);
     if (dateOnly) {
       date = dateOnly;
+      const locationOnly = extractLocationFromText(lastPart, dateOnly);
+      if (locationOnly) {
+        location = locationOnly;
+      }
     }
     // Name is everything except the date
     name = parts.slice(0, -1).join(", ");
@@ -82,6 +88,10 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
   }
 
   date = cleanDate(date);
+
+  if (!location && parts.length >= 3) {
+    location = parts[parts.length - 2];
+  }
 
   if (!isLikelyDate(date)) {
     const timeEl = doc.querySelector("time");
@@ -108,6 +118,7 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
     date,
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
+    location: location || undefined,
     category,
   };
 }
@@ -121,11 +132,25 @@ function cleanDate(value: string): string {
 
 function extractDateFromText(value: string): string {
   const cleaned = cleanDate(value);
-  const rangeMatch = cleaned.match(/(\d{1,2}\.\s*[–-]\s*\d{1,2}\.\d{1,2}\.\d{2,4})/);
+  const rangeMatch = cleaned.match(
+    /(\d{1,2}\.(?:\d{1,2}\.)?\s*[–-]\s*\d{1,2}\.\d{1,2}\.\d{2,4})/
+  );
   if (rangeMatch) return rangeMatch[1];
   const singleMatch = cleaned.match(/(\d{1,2}\.\d{1,2}\.\d{2,4})/);
   if (singleMatch) return singleMatch[1];
   return "";
+}
+
+function extractLocationFromText(value: string, dateOnly: string): string {
+  const cleaned = value
+    .replace(dateOnly, "")
+    .replace(/\s+-\s+Suomen Voimanostoliitto ry$/i, "")
+    .replace(/[–-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  if (!cleaned.match(/[A-Za-zÄÖÅäöå]/)) return "";
+  return cleaned;
 }
 
 function isLikelyDate(value: string): boolean {
