@@ -15,6 +15,7 @@ A powerlifting competition data scraper for [Suomen Voimanostoliitto](https://ww
 - **CLI** - Command-line interface for scripting and automation
 - **TUI** - Interactive terminal UI with menus
 - **Native macOS App** - GUI built with SwiftUI
+- **Data validation** - Automatic validation of scraped data with detailed warnings
 - **Incremental updates** - Caches HTML with hash comparison, skips unchanged competitions
 - **JSON Output** - Machine-readable output for app integration
 - **Per-competition output** - One file per competition by default (combined optional)
@@ -70,10 +71,10 @@ bun run cli discover [--clicks <n>] [--browser <path>] [--log-dir <dir>] [--json
 bun run cli list [--format table|json]
 
 # Scrape specific competitions by ID
-bun run cli scrape <ids...> [--output <dir>] [--format csv|json] [--combined] [--force] [--log-dir <dir>] [--json]
+bun run cli scrape <ids...> [--output <dir>] [--format csv|json] [--combined] [--force] [--validate] [--log-dir <dir>] [--json]
 
 # Scrape all cached competitions
-bun run cli scrape-all [--output <dir>] [--format csv|json] [--combined] [--force] [--log-dir <dir>] [--json]
+bun run cli scrape-all [--output <dir>] [--format csv|json] [--combined] [--force] [--validate] [--log-dir <dir>] [--json]
 ```
 
 The `--json` flag outputs machine-readable JSON events for integration use.
@@ -84,10 +85,19 @@ The `--force` flag bypasses the cache and re-scrapes all competitions, even if
 HTML hasn't changed. Without this flag, the scraper uses incremental updates
 (caches table HTML and skips parsing if unchanged).
 
+The `--validate` flag displays detailed validation warnings in the console. Validation
+runs automatically on every scrape and includes checks for:
+- Total calculation (sum of best lifts matches recorded total)
+- Data completeness (name and club fields present)
+- Reasonable ranges (weights 20-500kg, body weight 30-200kg)
+- Attempt progression (successful attempts don't decrease)
+
 In the TUI, output defaults to `./output`; you can change it under Settings.
 Per-competition output is the default; change it under Settings. You can also
 choose CSV or JSON output in Settings. Force mode can be toggled with 'f' in
-the scrape selection screen.
+the scrape selection screen. After scraping completes, the TUI shows a completion
+screen with validation summary; press 's' to toggle detailed breakdown or Escape
+to return to the menu.
 
 ## Requirements
 
@@ -152,6 +162,7 @@ src/
   tui.tsx       # TUI entry point (Ink)
   scraper.ts    # Discovery + scraping logic
   parser.ts     # SVNL HTML table parser
+  validate.ts   # Data validation with warnings
   cache.ts      # HTML caching with hash comparison
   output.ts     # CSV/JSON export
   log.ts        # JSON lines logging
