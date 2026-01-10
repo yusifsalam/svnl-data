@@ -57,7 +57,10 @@ function App() {
   async function loadSettings() {
     if (existsSync(SETTINGS_FILE)) {
       const data = JSON.parse(await readFile(SETTINGS_FILE, "utf-8"));
-      if (data.outputMode === "per-competition" || data.outputMode === "combined") {
+      if (
+        data.outputMode === "per-competition" ||
+        data.outputMode === "combined"
+      ) {
         setOutputMode(data.outputMode);
       }
       if (data.outputFormat === "csv" || data.outputFormat === "json") {
@@ -137,7 +140,9 @@ function App() {
                 },
                 logDir,
               );
-              setProgress(`Found ${comps.length} competitions! Log: ${logPath}`);
+              setProgress(
+                `Found ${comps.length} competitions! Log: ${logPath}`,
+              );
               setTimeout(() => setScreen("menu"), 2000);
             } catch (e) {
               setError(e instanceof Error ? e.message : String(e));
@@ -210,20 +215,22 @@ function App() {
                 timestamp: new Date().toISOString(),
                 operation: "scrape",
                 durationMs: Date.now() - startedAt,
-              details: {
-                competitions: results.length,
-                lifters: results.reduce(
-                  (sum, r) => sum + r.lifters.length,
-                  0,
-                ),
-                competitionIds: results.map((result) => result.competition.id),
-                combined: outputMode === "combined",
-                format: outputFormat,
-                outputDir,
+                details: {
+                  competitions: results.length,
+                  lifters: results.reduce(
+                    (sum, r) => sum + r.lifters.length,
+                    0,
+                  ),
+                  competitionIds: results.map(
+                    (result) => result.competition.id,
+                  ),
+                  combined: outputMode === "combined",
+                  format: outputFormat,
+                  outputDir,
+                },
               },
-            },
-            logDir,
-          );
+              logDir,
+            );
             setSelectedIds(new Set());
             setTimeout(() => {
               setScrapeSelection([]);
@@ -255,8 +262,6 @@ function App() {
   );
 }
 
-// ============ MAIN MENU ============
-
 function MainMenu({ onSelect }: { onSelect: (action: string) => void }) {
   const items = [
     { label: "Discover competitions", value: "discover" },
@@ -275,8 +280,6 @@ function MainMenu({ onSelect }: { onSelect: (action: string) => void }) {
     </Box>
   );
 }
-
-// ============ SETTINGS VIEW ============
 
 function SettingsView({
   outputMode,
@@ -416,8 +419,6 @@ function SettingsView({
   );
 }
 
-// ============ DISCOVER VIEW ============
-
 function DiscoverView({
   progress,
   onStart,
@@ -456,8 +457,6 @@ function DiscoverView({
     </Box>
   );
 }
-
-// ============ LIST VIEW ============
 
 function ListView({
   competitions,
@@ -498,8 +497,6 @@ function ListView({
     </Box>
   );
 }
-
-// ============ SCRAPE SELECT VIEW ============
 
 function ScrapeSelectView({
   competitions,
@@ -582,8 +579,6 @@ function ScrapeSelectView({
   );
 }
 
-// ============ SCRAPING VIEW ============
-
 function ScrapingView({
   competitions,
   progress,
@@ -626,7 +621,5 @@ function ScrapingView({
     </Box>
   );
 }
-
-// ============ RENDER ============
 
 render(<App />);

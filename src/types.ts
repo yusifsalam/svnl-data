@@ -37,10 +37,8 @@ export interface CompetitionResult {
   lifters: Lifter[];
 }
 
-// Progress callback for CLI/TUI
 export type ProgressCallback = (message: string) => void;
 
-// JSON output events for SwiftUI integration
 export type JsonEvent =
   | { type: "progress"; message: string }
   | { type: "complete"; data: unknown }
