@@ -3,22 +3,18 @@ import SwiftData
 
 @Model
 final class CompetitionScrapeDetail {
-    // Identity
     var id: UUID
     var competitionId: String
     var competitionName: String?
     var competitionDate: String?
 
-    // Progress
     var liftersProcessed: Int
     var totalLifters: Int
     var timestamp: Date
 
-    // Status
     var status: Status
     var errorMessage: String?
 
-    // Relationship
     var scrapeJob: ScrapeJob?
 
     enum Status: String, Codable {

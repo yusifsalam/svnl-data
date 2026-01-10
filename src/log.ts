@@ -1,5 +1,3 @@
-// Log file writer for operations
-
 import { appendFile, mkdir } from "fs/promises";
 import { join, resolve } from "path";
 

@@ -1,5 +1,3 @@
-// CSV and JSON output generation
-
 import { mkdir, writeFile } from "fs/promises";
 import { dirname, join, resolve } from "path";
 import type { Attempt, CompetitionResult } from "./types";

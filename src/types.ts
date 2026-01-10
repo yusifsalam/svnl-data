@@ -1,5 +1,3 @@
-// Core data structures for SVNL scraper
-
 export interface Competition {
   id: string;
   url: string;

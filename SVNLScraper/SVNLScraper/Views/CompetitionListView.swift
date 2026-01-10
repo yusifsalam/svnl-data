@@ -19,7 +19,6 @@ struct CompetitionListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "list.bullet.clipboard")
@@ -119,7 +118,6 @@ struct CompetitionListView: View {
                 )
             }
 
-            // Status footer
             if viewModel.statusMessage != nil || viewModel.errorMessage != nil || !viewModel.errorLog.isEmpty {
                 Divider()
 

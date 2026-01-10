@@ -6,7 +6,6 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Image(systemName: "gear")
                     .font(.title)
@@ -20,10 +19,9 @@ struct SettingsView: View {
 
             Divider()
 
-            // Content
+
             ScrollView {
                 VStack(spacing: 20) {
-                    // Paths Section
                     VStack(alignment: .leading, spacing: 16) {
                         Label("Paths", systemImage: "folder")
                             .font(.headline)
@@ -116,7 +114,6 @@ struct SettingsView: View {
                         }
                     }
 
-                    // Browser Section
                     VStack(alignment: .leading, spacing: 16) {
                         Label("Browser", systemImage: "safari")
                             .font(.headline)
@@ -139,7 +136,6 @@ struct SettingsView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                     }
 
-                    // Discovery Section
                     VStack(alignment: .leading, spacing: 16) {
                         Label("Discovery", systemImage: "magnifyingglass")
                             .font(.headline)
@@ -172,7 +168,6 @@ struct SettingsView: View {
 
             Divider()
 
-            // Footer
             HStack {
                 Spacer()
                 Button {

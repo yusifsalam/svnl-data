@@ -6,7 +6,6 @@ struct ScrapeProgressView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Status Header
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     HStack(spacing: 8) {
@@ -69,7 +68,6 @@ struct ScrapeProgressView: View {
                     }
                 }
 
-                // Progress bar
                 if viewModel.total > 0 {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
@@ -100,7 +98,6 @@ struct ScrapeProgressView: View {
 
             Divider()
 
-            // Logs
             if viewModel.logLines.isEmpty {
                 VStack(spacing: 16) {
                     Spacer()

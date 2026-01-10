@@ -14,7 +14,6 @@ struct CsvPreviewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(inline ? .title3 : .title)
@@ -40,11 +39,9 @@ struct CsvPreviewView: View {
 
             Divider()
 
-            // Content
             HSplitView {
                 if !inline {
                     VStack(alignment: .leading, spacing: 0) {
-                        // File list header
                         HStack {
                             Label("Files", systemImage: "folder")
                                 .font(.headline)
@@ -56,7 +53,6 @@ struct CsvPreviewView: View {
 
                         Divider()
 
-                        // File list
                         List(selection: $selectedFile) {
                             ForEach(viewModel.files) { file in
                                 VStack(alignment: .leading, spacing: 6) {

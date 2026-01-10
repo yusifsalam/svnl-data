@@ -1,5 +1,3 @@
-// SVNL scraper - discovery and scraping logic
-
 import puppeteer from "puppeteer-core";
 import { parseCompetitionPage } from "./parser";
 import type { Competition, CompetitionResult, ProgressCallback } from "./types";

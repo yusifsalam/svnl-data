@@ -33,7 +33,6 @@ final class HistoryViewModel: ObservableObject {
         do {
             jobs = try context.fetch(descriptor)
 
-            // Refresh CSV file existence
             for job in jobs {
                 checkCsvFileExists(for: job)
             }

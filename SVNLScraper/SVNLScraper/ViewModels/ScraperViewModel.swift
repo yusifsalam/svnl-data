@@ -37,7 +37,6 @@ final class ScraperViewModel: ObservableObject {
         statusMessage = "Starting scrape..."
         showPreview = false
 
-        // Create ScrapeJob and save to SwiftData
         if let context = modelContext {
             let job = ScrapeJob(
                 startTime: Date(),
@@ -95,13 +94,11 @@ final class ScraperViewModel: ObservableObject {
         service?.terminate()
         statusMessage = "Stopping..."
 
-        // Mark job as stopped
         if let job = currentJob, let context = modelContext {
             job.endTime = Date()
             job.isComplete = true
             job.wasStopped = true
 
-            // Mark any in-progress competition as failed
             if let detail = currentCompetitionDetail {
                 detail.status = .failed
                 detail.errorMessage = "Scrape stopped by user"
@@ -271,7 +268,6 @@ final class ScraperViewModel: ObservableObject {
             options: [.skipsHiddenFiles]
         ) else { return nil }
 
-        // Find newest CSV file
         let csvFiles = files
             .filter { $0.pathExtension == "csv" }
             .compactMap { url -> (URL, Date)? in

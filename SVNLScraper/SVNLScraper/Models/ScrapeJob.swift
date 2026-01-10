@@ -3,36 +3,29 @@ import SwiftData
 
 @Model
 final class ScrapeJob {
-    // Identity
     var id: UUID
     var startTime: Date
     var endTime: Date?
 
-    // Status
     var isComplete: Bool
     var wasStopped: Bool
 
-    // Metrics
     var totalCompetitions: Int
     var successfulCompetitions: Int
     var failedCompetitions: Int
     var totalLiftersProcessed: Int
 
-    // CSV Output
     var csvFilePath: String?
     var csvFileExists: Bool
     var outputPathsData: Data?
 
-    // Settings Snapshot
     var headlessMode: Bool
     var chromePath: String?
     var outputDirectory: String
 
-    // Relationships
     @Relationship(deleteRule: .cascade, inverse: \CompetitionScrapeDetail.scrapeJob)
     var competitionDetails: [CompetitionScrapeDetail]
 
-    // Computed Properties
     var duration: TimeInterval? {
         guard let end = endTime else { return nil }
         return end.timeIntervalSince(startTime)

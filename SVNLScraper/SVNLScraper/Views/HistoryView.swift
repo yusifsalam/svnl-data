@@ -9,7 +9,6 @@ struct HistoryView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.title)
@@ -23,7 +22,6 @@ struct HistoryView: View {
             
             Divider()
             
-            // Content
             HSplitView {
                 jobListView
                 
@@ -31,7 +29,6 @@ struct HistoryView: View {
                     jobDetailView(job: selected)
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Detail header
                         HStack {
                             Label("Details", systemImage: "info.circle")
                                 .font(.headline)
@@ -63,7 +60,6 @@ struct HistoryView: View {
     
     private var jobListView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Job list header
             HStack {
                 Label("Jobs", systemImage: "list.bullet")
                     .font(.headline)
@@ -95,7 +91,6 @@ struct HistoryView: View {
             
             Divider()
             
-            // Job List
             if viewModel.isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -159,7 +154,6 @@ struct HistoryView: View {
     
     private func jobDetailView(job: ScrapeJob) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Detail header
             HStack {
                 Label("Details", systemImage: "info.circle")
                     .font(.headline)
@@ -180,7 +174,6 @@ struct HistoryView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Job info
                     VStack(alignment: .leading, spacing: 8) {
                         Text(job.startTime.formatted(date: .long, time: .shortened))
                             .font(.title2.bold())
@@ -209,7 +202,6 @@ struct HistoryView: View {
                     .padding()
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                     
-                    // Summary Stats
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
                         GridItem(.flexible()),
@@ -244,7 +236,6 @@ struct HistoryView: View {
                         )
                     }
                     
-                    // Settings Snapshot
                     VStack(alignment: .leading, spacing: 12) {
                         Label("Settings", systemImage: "gear")
                             .font(.headline)
@@ -278,7 +269,6 @@ struct HistoryView: View {
                     .padding()
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                     
-                    // Competition Details
                     if !job.competitionDetails.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Label("Competition Details", systemImage: "list.bullet")
@@ -436,7 +426,6 @@ struct CompetitionDetailRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Status icon
             Image(systemName: detail.status == .success ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundStyle(detail.status == .success ? .green : .red)
 

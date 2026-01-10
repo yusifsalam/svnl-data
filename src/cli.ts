@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// SVNL Scraper CLI
 
 import chalk from "chalk";
 import { Command } from "commander";
@@ -24,8 +23,6 @@ const program = new Command()
 function jsonEvent(event: JsonEvent) {
   console.log(JSON.stringify(event));
 }
-
-// ============ DISCOVER COMMAND ============
 
 program
   .command("discover")
@@ -53,7 +50,6 @@ program
         },
       });
 
-      // Save to cache
       await mkdir(DATA_DIR, { recursive: true });
       await writeFile(CACHE_FILE, JSON.stringify(competitions, null, 2));
       await appendLog(
@@ -85,8 +81,6 @@ program
       process.exit(1);
     }
   });
-
-// ============ LIST COMMAND ============
 
 program
   .command("list")
@@ -122,8 +116,6 @@ program
     }
   });
 
-// ============ SCRAPE COMMAND ============
-
 program
   .command("scrape <ids...>")
   .description("Scrape specific competitions by ID")
@@ -150,7 +142,6 @@ program
       await readFile(CACHE_FILE, "utf-8"),
     );
 
-    // Find competitions by ID
     const competitions = allCompetitions.filter((c) => ids.includes(c.id));
 
     if (competitions.length === 0) {
@@ -174,7 +165,6 @@ program
         },
       });
 
-      // Write output
       const timestamp = Date.now();
       const outputDir = resolve(opts.output);
       const logDir = resolve(opts.logDir);
@@ -248,8 +238,6 @@ program
       process.exit(1);
     }
   });
-
-// ============ SCRAPE-ALL COMMAND ============
 
 program
   .command("scrape-all")

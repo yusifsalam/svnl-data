@@ -1,5 +1,3 @@
-// SVNL HTML parser
-
 import { parseHTML } from "linkedom";
 import type { Attempt, Competition, CompetitionResult, Lifter } from "./types";
 

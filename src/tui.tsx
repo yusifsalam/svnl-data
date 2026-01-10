@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// SVNL Scraper TUI
 
 import { existsSync } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
