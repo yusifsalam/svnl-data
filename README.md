@@ -6,6 +6,7 @@ A powerlifting competition data scraper for [Suomen Voimanostoliitto](https://ww
 
 - **CLI** - Command-line interface for scripting and automation
 - **TUI** - Interactive terminal UI with menus
+- **Native macOS App** - GUI built with SwiftUI 
 - **JSON Output** - Machine-readable output for app integration
 - **Per-competition output** - One file per competition by default (combined optional)
 
@@ -48,8 +49,7 @@ bun run build:cli
 
 The app stores CSV/JSON output under `~/Documents/SVNLScraper` by default, and
 logs under `~/Documents/SVNLScraper/logs/svnl-log.jsonl`. Both can be changed
-in the app Settings. Output format (CSV/JSON) and per-competition vs combined
-mode are also configurable there.
+in the app Settings. Output format (CSV/JSON) and per-competition vs combined mode are also configurable there.
 
 ## CLI Commands
 
@@ -136,4 +136,8 @@ src/
   parser.ts     # SVNL HTML table parser
   output.ts     # CSV/JSON export
   types.ts      # TypeScript interfaces
+SVNLScraper/
+  SVNLScraper.xcodeproj
+  SVNLScraper/
+    Resources/ # Bundled CLI (svnl-cli)
 ```
