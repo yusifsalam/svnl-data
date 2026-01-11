@@ -20,6 +20,41 @@ A powerlifting competition data scraper for [Suomen Voimanostoliitto](https://ww
 - **JSON Output** - Machine-readable output for app integration
 - **Per-competition output** - One file per competition by default (combined optional)
 
+## Requirements
+
+- **Bun** - JavaScript runtime
+- **Chrome/Chromium** - Required for Puppeteer browser automation
+
+## Project Structure
+
+```
+src/
+  cli/
+    main.ts     # CLI entry point
+    types.ts    
+    scraper.ts  # Discovery + scraping logic
+    parser.ts   # SVNL HTML table parser
+    validate.ts # Data validation with warnings
+    cache.ts    # HTML caching with hash comparison
+    output.ts   # CSV/JSON export
+    log.ts      # JSON lines logging
+  tui/
+    main.tsx    # TUI entry point
+    types.ts   
+    components/
+      MainMenu.tsx
+      SettingsView.tsx
+      DiscoverView.tsx
+      ListView.tsx
+      ScrapeSelectView.tsx
+      ScrapingView.tsx
+      ScrapeCompleteView.tsx
+SVNLScraper/
+  SVNLScraper.xcodeproj
+  SVNLScraper/
+    Resources/ # Bundled CLI (svnl-cli)
+```
+
 ## Quick Start
 
 ```bash
@@ -45,21 +80,24 @@ bun run tui
 bun run build:cli
 ```
 
-## SwiftUI App
 
-The macOS SwiftUI app lives in `SVNLScraper/`. It bundles the compiled CLI
-binary (`svnl-cli`) and runs it for discover/scrape operations.
+### How It Works
 
-Open `SVNLScraper/SVNLScraper.xcodeproj` in Xcode and build the **Release**
-configuration to bundle the CLI automatically. The build phase runs:
+1. **Discovery** uses Puppeteer to load the SVNL archive page and click "Load more" buttons
+2. **Scraping** uses simple HTTP fetch (SVNL pages don't need JavaScript)
+3. **Caching** extracts and caches table HTML with SHA-256 hash comparison (skips parsing if unchanged)
+4. **Parsing** extracts lifter data from HTML tables
+5. **Export** outputs results to CSV or JSON
 
-```
-bun run build:cli
-```
+Cached HTML is stored in `~/.svnl-scraper/html/` with only the relevant table data.
+Use `--force` to bypass the cache.
 
-The app stores CSV/JSON output under `~/Documents/SVNLScraper` by default, and
-logs under `~/Documents/SVNLScraper/logs/svnl-log.jsonl`. Both can be changed
-in the app Settings. Output format (CSV/JSON) and per-competition vs combined mode are also configurable there.
+## Configuration
+
+Set via environment variables:
+
+- `SVNL_BROWSER_PATH` - Path to Chrome/Chromium executable
+
 
 ## CLI Commands
 
@@ -99,10 +137,18 @@ the scrape selection screen. After scraping completes, the TUI shows a completio
 screen with validation summary; press 's' to toggle detailed breakdown or Escape
 to return to the menu.
 
-## Requirements
 
-- **Bun** - JavaScript runtime
-- **Chrome/Chromium** - Required for discovery (clicking "Load more" buttons)
+## SwiftUI App
+
+The macOS SwiftUI app lives in `SVNLScraper/`. It bundles the compiled CLI
+binary (`svnl-cli`) and runs it for discover/scrape operations.
+
+Open `SVNLScraper/SVNLScraper.xcodeproj` in Xcode and build the **Release**
+configuration to bundle the CLI automatically.
+
+The app stores CSV/JSON output under `~/Documents/SVNLScraper` by default, and
+logs under `~/Documents/SVNLScraper/logs/svnl-log.jsonl`. Both can be changed
+in the app Settings. Output format (CSV/JSON) and per-competition vs combined mode are also configurable there.
 
 ## Build a Standalone CLI
 
@@ -121,24 +167,6 @@ You can run the binary directly:
 ./dist/svnl-cli scrape svnl-pv-81
 ```
 
-## How It Works
-
-1. **Discovery** uses Puppeteer to load the SVNL archive page and click "Load more" buttons
-2. **Scraping** uses simple HTTP fetch (SVNL pages don't need JavaScript)
-3. **Caching** extracts and caches table HTML with SHA-256 hash comparison (skips parsing if unchanged)
-4. **Parsing** extracts lifter data from HTML tables
-5. **Export** outputs results to CSV or JSON
-
-Cached HTML is stored in `~/.svnl-scraper/html/` with only the relevant table data
-(~90% storage savings vs full HTML). Use `--force` to bypass the cache.
-
-## CSV Fields (selected)
-
-- `event_type` is `sbd` or `b`
-- `equipment` is `raw` or `equipped`
-- `weight_class` is stored as a string (e.g. `-57`, `84+`)
-- attempt success columns use `*_success` suffix
-
 ## Logs
 
 Each operation appends a JSONL entry to `svnl-log.jsonl` with the operation
@@ -147,39 +175,3 @@ IDs in the log details.
 
 - Logs default to `./logs` unless `--log-dir` is set
 - In the TUI, log output defaults to `./logs` and is configurable under Settings
-
-## Configuration
-
-Set via environment variables:
-
-- `SVNL_BROWSER_PATH` - Path to Chrome/Chromium executable
-
-## Project Structure
-
-```
-src/
-  cli/
-    main.ts     # CLI entry point (Commander)
-    types.ts    # TypeScript interfaces
-    scraper.ts  # Discovery + scraping logic
-    parser.ts   # SVNL HTML table parser
-    validate.ts # Data validation with warnings
-    cache.ts    # HTML caching with hash comparison
-    output.ts   # CSV/JSON export
-    log.ts      # JSON lines logging
-  tui/
-    main.tsx    # TUI entry point (Ink)
-    types.ts    # TUI-specific types (Screen, OutputMode, OutputFormat)
-    components/ # TUI view components
-      MainMenu.tsx
-      SettingsView.tsx
-      DiscoverView.tsx
-      ListView.tsx
-      ScrapeSelectView.tsx
-      ScrapingView.tsx
-      ScrapeCompleteView.tsx
-SVNLScraper/
-  SVNLScraper.xcodeproj
-  SVNLScraper/
-    Resources/ # Bundled CLI (svnl-cli)
-```
