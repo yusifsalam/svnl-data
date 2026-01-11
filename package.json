@@ -4,9 +4,9 @@
   "description": "SVNL powerlifting competition scraper",
   "type": "module",
   "scripts": {
-    "cli": "bun run src/cli.ts",
+    "cli": "bun run src/cli/main.ts",
     "tui": "bun run src/tui/main.tsx",
-    "build:cli": "bun build src/cli.ts --compile --outfile dist/svnl-cli",
+    "build:cli": "bun build src/cli/main.ts --compile --outfile dist/svnl-cli",
     "test": "bun test"
   },
   "dependencies": {

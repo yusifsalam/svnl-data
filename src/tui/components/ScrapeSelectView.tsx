@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { useState } from "react";
-import type { Competition } from "../../types";
+import type { Competition } from "../../cli/types";
 
 export function ScrapeSelectView({
   competitions,
@@ -65,7 +65,12 @@ export function ScrapeSelectView({
       </Text>
       <Box marginTop={1}>
         <Text>
-          Force mode: {forceMode ? <Text color="yellow">ON</Text> : <Text color="gray">OFF</Text>}
+          Force mode:{" "}
+          {forceMode ? (
+            <Text color="yellow">ON</Text>
+          ) : (
+            <Text color="gray">OFF</Text>
+          )}
         </Text>
         <Text color="gray"> (bypass cache)</Text>
       </Box>
@@ -89,7 +94,8 @@ export function ScrapeSelectView({
       </Box>
       <Box marginTop={1}>
         <Text color="gray">
-          Space to toggle, F for force mode, Enter to start, ←/→ pages, Esc to cancel
+          Space to toggle, F for force mode, Enter to start, ←/→ pages, Esc to
+          cancel
         </Text>
       </Box>
     </Box>

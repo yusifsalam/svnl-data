@@ -1,8 +1,8 @@
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useEffect, useState } from "react";
-import { scrapeCompetitions } from "../../scraper";
-import type { Competition, CompetitionResult } from "../../types";
+import { scrapeCompetitions } from "../../cli/scraper";
+import type { Competition, CompetitionResult } from "../../cli/types";
 
 export function ScrapingView({
   competitions,
