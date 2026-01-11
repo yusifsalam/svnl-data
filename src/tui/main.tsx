@@ -23,6 +23,24 @@ const DATA_DIR = join(homedir(), ".svnl-scraper");
 const CACHE_FILE = join(DATA_DIR, "competitions.json");
 const SETTINGS_FILE = join(DATA_DIR, "settings.json");
 
+async function saveCache(comps: Competition[]) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(CACHE_FILE, JSON.stringify(comps, null, 2));
+}
+
+async function saveSettings(
+  outputMode: OutputMode,
+  outputFormat: OutputFormat,
+  outputDir: string,
+  logDir: string,
+) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(
+    SETTINGS_FILE,
+    JSON.stringify({ outputMode, outputFormat, outputDir, logDir }, null, 2),
+  );
+}
+
 function App() {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>("menu");
@@ -52,11 +70,6 @@ function App() {
     }
   }
 
-  async function saveCache(comps: Competition[]) {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(CACHE_FILE, JSON.stringify(comps, null, 2));
-  }
-
   async function loadSettings() {
     if (existsSync(SETTINGS_FILE)) {
       const data = JSON.parse(await readFile(SETTINGS_FILE, "utf-8"));
@@ -79,17 +92,9 @@ function App() {
     setSettingsLoaded(true);
   }
 
-  async function saveSettings() {
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(
-      SETTINGS_FILE,
-      JSON.stringify({ outputMode, outputFormat, outputDir, logDir }, null, 2),
-    );
-  }
-
   useEffect(() => {
     if (!settingsLoaded) return;
-    saveSettings();
+    saveSettings(outputMode, outputFormat, outputDir, logDir);
   }, [outputMode, outputFormat, outputDir, logDir, settingsLoaded]);
 
   return (
