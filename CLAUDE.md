@@ -38,12 +38,20 @@ bun test
 
 ## Architecture
 
-Simple 9-file structure:
-
 ```
 src/
   cli.ts        # CLI entry point using Commander
-  tui.tsx       # TUI entry point using Ink (React)
+  tui/
+    main.tsx    # TUI entry point using Ink (React)
+    types.ts    # TUI-specific types (Screen, OutputMode, OutputFormat)
+    components/ # TUI view components
+      MainMenu.tsx
+      SettingsView.tsx
+      DiscoverView.tsx
+      ListView.tsx
+      ScrapeSelectView.tsx
+      ScrapingView.tsx
+      ScrapeCompleteView.tsx
   scraper.ts    # Discovery (Puppeteer) + scraping (fetch)
   parser.ts     # SVNL HTML table parser
   validate.ts   # Data validation with warnings

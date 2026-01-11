@@ -159,7 +159,17 @@ Set via environment variables:
 ```
 src/
   cli.ts        # CLI entry point (Commander)
-  tui.tsx       # TUI entry point (Ink)
+  tui/
+    main.tsx    # TUI entry point (Ink)
+    types.ts    # TUI-specific types (Screen, OutputMode, OutputFormat)
+    components/ # TUI view components
+      MainMenu.tsx
+      SettingsView.tsx
+      DiscoverView.tsx
+      ListView.tsx
+      ScrapeSelectView.tsx
+      ScrapingView.tsx
+      ScrapeCompleteView.tsx
   scraper.ts    # Discovery + scraping logic
   parser.ts     # SVNL HTML table parser
   validate.ts   # Data validation with warnings
