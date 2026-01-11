@@ -40,7 +40,15 @@ bun test
 
 ```
 src/
-  cli.ts        # CLI entry point using Commander
+  cli/
+    main.ts     # CLI entry point using Commander
+    types.ts    # TypeScript interfaces
+    scraper.ts  # Discovery (Puppeteer) + scraping (fetch)
+    parser.ts   # SVNL HTML table parser
+    validate.ts # Data validation with warnings
+    cache.ts    # HTML caching with hash comparison
+    output.ts   # CSV/JSON export
+    log.ts      # JSON lines logging utility
   tui/
     main.tsx    # TUI entry point using Ink (React)
     types.ts    # TUI-specific types (Screen, OutputMode, OutputFormat)
@@ -52,13 +60,6 @@ src/
       ScrapeSelectView.tsx
       ScrapingView.tsx
       ScrapeCompleteView.tsx
-  scraper.ts    # Discovery (Puppeteer) + scraping (fetch)
-  parser.ts     # SVNL HTML table parser
-  validate.ts   # Data validation with warnings
-  cache.ts      # HTML caching with hash comparison
-  output.ts     # CSV/JSON export
-  log.ts        # JSON lines logging utility
-  types.ts      # TypeScript interfaces
 ```
 
 ### Key Design Decisions

@@ -158,7 +158,15 @@ Set via environment variables:
 
 ```
 src/
-  cli.ts        # CLI entry point (Commander)
+  cli/
+    main.ts     # CLI entry point (Commander)
+    types.ts    # TypeScript interfaces
+    scraper.ts  # Discovery + scraping logic
+    parser.ts   # SVNL HTML table parser
+    validate.ts # Data validation with warnings
+    cache.ts    # HTML caching with hash comparison
+    output.ts   # CSV/JSON export
+    log.ts      # JSON lines logging
   tui/
     main.tsx    # TUI entry point (Ink)
     types.ts    # TUI-specific types (Screen, OutputMode, OutputFormat)
@@ -170,13 +178,6 @@ src/
       ScrapeSelectView.tsx
       ScrapingView.tsx
       ScrapeCompleteView.tsx
-  scraper.ts    # Discovery + scraping logic
-  parser.ts     # SVNL HTML table parser
-  validate.ts   # Data validation with warnings
-  cache.ts      # HTML caching with hash comparison
-  output.ts     # CSV/JSON export
-  log.ts        # JSON lines logging
-  types.ts      # TypeScript interfaces
 SVNLScraper/
   SVNLScraper.xcodeproj
   SVNLScraper/
