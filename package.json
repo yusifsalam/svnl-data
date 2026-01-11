@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "cli": "bun run src/cli.ts",
-    "tui": "bun run src/tui.tsx",
+    "tui": "bun run src/tui/main.tsx",
     "build:cli": "bun build src/cli.ts --compile --outfile dist/svnl-cli",
     "test": "bun test"
   },
