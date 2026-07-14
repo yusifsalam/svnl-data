@@ -1,22 +1,36 @@
 import { parseHTML } from "linkedom";
-import type { Attempt, Competition, CompetitionResult, Lifter } from "./types";
+import type {
+  Attempt,
+  Competition,
+  CompetitionResult,
+  Lifter,
+  ParseConfidence,
+  ParseIssue,
+  ParseReport,
+  TableReport,
+} from "./types";
 
 /**
- * Parse a competition page HTML into structured data
+ * Parse a competition page HTML into structured data.
+ * The report captures what the parser saw and guessed, so a source
+ * format change surfaces as diagnostics instead of silent bad data.
  */
 export function parseCompetitionPage(
   html: string,
   competition: Competition,
-): CompetitionResult[] {
+): { results: CompetitionResult[]; report: ParseReport } {
   const { document } = parseHTML(html);
 
   const parsedCompetition = parseEventInfo(document, competition);
-  let lifters = parseLifters(document);
+  const outcome = parseLifters(document);
+  let lifters = outcome.lifters;
 
   const competitionNameLower = parsedCompetition.name.toLowerCase();
   if (competitionNameLower.includes("varuste")) {
     lifters = lifters.map((lifter) => ({ ...lifter, equipment: "equipped" }));
   }
+
+  const report = buildParseReport(outcome, lifters.length);
 
   const eventType = detectEventType(lifters);
 
@@ -28,7 +42,10 @@ export function parseCompetitionPage(
   }
 
   if (byEquipment.size <= 1) {
-    return [{ competition: { ...parsedCompetition, eventType }, lifters }];
+    return {
+      results: [{ competition: { ...parsedCompetition, eventType }, lifters }],
+      report,
+    };
   }
 
   const results: CompetitionResult[] = [];
@@ -45,7 +62,54 @@ export function parseCompetitionPage(
     });
   }
 
-  return results;
+  return { results, report };
+}
+
+function buildParseReport(
+  outcome: LiftersOutcome,
+  lifterCount: number,
+): ParseReport {
+  const issues = [...outcome.issues];
+
+  if (outcome.tablesMatched === 0) {
+    issues.push({
+      severity: "error",
+      code: "no_results_table",
+      message: `No results table recognized (${outcome.tablesSeen} tables on page)`,
+    });
+  } else if (lifterCount === 0) {
+    issues.push({
+      severity: "error",
+      code: "no_lifters_parsed",
+      message: "Results table matched but no lifter rows were parsed",
+    });
+  }
+
+  let confidence: ParseConfidence = "ok";
+  for (const table of outcome.tables) {
+    if (table.matched) {
+      if (table.confidence === "failed") confidence = "failed";
+      else if (table.confidence === "suspect" && confidence === "ok") {
+        confidence = "suspect";
+      }
+    } else if (confidence === "ok") {
+      // A table-shaped table nobody recognized may be lost results;
+      // degrade so it surfaces, but matched-table failures rank higher
+      confidence = "suspect";
+    }
+  }
+  if (outcome.tablesMatched === 0 || lifterCount === 0) {
+    confidence = "failed";
+  }
+
+  return {
+    tablesSeen: outcome.tablesSeen,
+    tablesMatched: outcome.tablesMatched,
+    tables: outcome.tables,
+    issues,
+    liftersParsed: lifterCount,
+    confidence,
+  };
 }
 
 /**
@@ -160,7 +224,7 @@ function isLikelyDate(value: string): boolean {
   );
 }
 
-function parseDateRange(dateText: string): {
+export function parseDateRange(dateText: string): {
   startDate?: string;
   endDate?: string;
 } {
@@ -188,27 +252,113 @@ function parseDateRange(dateText: string): {
 }
 
 /**
+ * Identify a results table and its header row. Shared with cache.ts so
+ * extraction and parsing can never disagree on which tables count.
+ * Primary signal is the Nimi column paired with Seura or Sarja; a row
+ * naming two or more lifts is accepted as a fallback so a renamed
+ * name/club header doesn't silently drop the whole table.
+ */
+export function isResultsTable(rows: Element[]): {
+  match: boolean;
+  headerRowIndex: number;
+} {
+  for (let i = 0; i < rows.length; i++) {
+    const text = rows[i].textContent?.toLowerCase() || "";
+    if (
+      text.includes("nimi") &&
+      (text.includes("seura") || text.includes("sarja"))
+    ) {
+      return { match: true, headerRowIndex: i };
+    }
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const text = rows[i].textContent?.toLowerCase() || "";
+    const liftHeaderCount = ["jalkakyykky", "penkkipunnerrus", "maastanosto"]
+      .filter((lift) => text.includes(lift)).length;
+    if (liftHeaderCount >= 2) {
+      return { match: true, headerRowIndex: i };
+    }
+  }
+  return { match: false, headerRowIndex: -1 };
+}
+
+type LiftersOutcome = {
+  lifters: Lifter[];
+  tables: TableReport[];
+  issues: ParseIssue[];
+  tablesSeen: number;
+  tablesMatched: number;
+};
+
+export function isTableShaped(rows: Element[]): boolean {
+  return (
+    rows.length >= 3 &&
+    rows.some((row) => row.querySelectorAll("td, th").length >= 6)
+  );
+}
+
+/**
  * Parse all lifters from results tables
  */
-function parseLifters(doc: Document): Lifter[] {
+function parseLifters(doc: Document): LiftersOutcome {
   const lifters: Lifter[] = [];
-  const tables = doc.querySelectorAll("table");
+  const tableReports: TableReport[] = [];
+  const issues: ParseIssue[] = [];
+  const tables = Array.from(doc.querySelectorAll("table"));
+  let tablesMatched = 0;
 
-  for (const table of tables) {
-    // Find header rows to determine column layout
+  for (let tableIndex = 0; tableIndex < tables.length; tableIndex++) {
+    const table = tables[tableIndex];
     const rows = Array.from(table.querySelectorAll("tr"));
 
-    // Look for the row containing "Nimi" and "Seura" to identify this as a results table
-    let headerRowIndex = -1;
-    for (let i = 0; i < rows.length; i++) {
-      const text = rows[i].textContent?.toLowerCase() || "";
-      if (text.includes("nimi") && text.includes("seura")) {
-        headerRowIndex = i;
-        break;
+    const { match, headerRowIndex } = isResultsTable(rows);
+    if (!match) {
+      // A table-shaped table that fails the gate is the alarm for
+      // "the header wording changed and we stopped recognizing results"
+      if (isTableShaped(rows)) {
+        const snippet = (rows[0]?.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 120);
+        tableReports.push({
+          tableIndex,
+          matched: false,
+          skippedReason: "no recognizable results header",
+          fallbacksUsed: [],
+          rowsParsed: 0,
+          rowsDroppedExpected: 0,
+          droppedRows: [],
+          checks: {},
+          confidence: "failed",
+        });
+        issues.push({
+          severity: "warning",
+          code: "table_unmatched",
+          message: `Table ${tableIndex} looks like a results table but no header row was recognized`,
+          tableIndex,
+          snippet,
+        });
       }
+      continue;
     }
+    tablesMatched++;
 
-    if (headerRowIndex === -1) continue;
+    const tableLifterStart = lifters.length;
+    const fallbacksUsed: string[] = [];
+    let rowsDroppedExpected = 0;
+    // Results tables end with records/judges sections; drops there are
+    // structural, not lost lifters
+    let inFooterSection = false;
+    const droppedRows: TableReport["droppedRows"] = [];
+    const dropRow = (rowIndex: number, reason: string, text: string) => {
+      if (droppedRows.length < 20) {
+        droppedRows.push({
+          rowIndex,
+          reason,
+          snippet: text.replace(/\s+/g, " ").trim().slice(0, 120),
+        });
+      }
+    };
 
     // SVNL tables have fixed column structure:
     // 0: Sij (position)
@@ -230,10 +380,66 @@ function parseLifters(doc: Document): Lifter[] {
       headerRowIndex + 1 < rows.length && isHeaderRow(rows[headerRowIndex + 1])
         ? rows[headerRowIndex + 1]
         : undefined;
-    const columnMap = detectColumnMap(rows[headerRowIndex], subHeaderRow);
+    const columnMap = detectColumnMap(
+      rows[headerRowIndex],
+      subHeaderRow,
+      fallbacksUsed,
+    );
     const dataStartIndex = subHeaderRow
       ? headerRowIndex + 2
       : headerRowIndex + 1;
+
+    const missingCritical: string[] = [];
+    if (columnMap.name === undefined) missingCritical.push("name");
+    if (columnMap.club === undefined) missingCritical.push("club");
+    if (columnMap.position === undefined) missingCritical.push("position");
+    if (columnMap.bodyWeight === undefined) missingCritical.push("bodyWeight");
+    if (columnMap.total === undefined) missingCritical.push("total");
+    if (columnMap.benchStart === undefined) missingCritical.push("benchStart");
+    if (missingCritical.length > 0) {
+      fallbacksUsed.push(
+        `legacy_positional_map(${missingCritical.join(",")})`,
+      );
+    }
+
+    // Header-derived indices with the historical fixed layout as the
+    // fallback candidate; when the candidate is in play (fallbacksUsed)
+    // the cross-checks decide whether its output is trustworthy
+    const positionIndex = columnMap.position ?? 0;
+    const genderIndex = columnMap.gender;
+    const weightClassIndex = columnMap.weightClass ?? 2;
+    const bodyWeightIndex = columnMap.bodyWeight ?? 3;
+    const nameIndex = columnMap.name ?? 4;
+    const clubIndex = columnMap.club ?? 5;
+    const birthYearIndex = columnMap.birthYear;
+    const squatStart = columnMap.squatStart;
+    const benchStart = columnMap.benchStart ?? 10;
+    const deadliftStart = columnMap.deadliftStart;
+    const totalIndex = columnMap.total ?? 18;
+    const pointsIndex = columnMap.points ?? 19;
+
+    const resolvedMap: ColumnMap = {
+      ...columnMap,
+      position: positionIndex,
+      weightClass: weightClassIndex,
+      bodyWeight: bodyWeightIndex,
+      name: nameIndex,
+      club: clubIndex,
+      benchStart,
+      total: totalIndex,
+      points: pointsIndex,
+    };
+
+    const minRequiredIndex = Math.max(
+      nameIndex,
+      clubIndex,
+      positionIndex,
+      genderIndex ?? -1,
+      weightClassIndex,
+      bodyWeightIndex,
+    );
+
+    let keptNoPosition = 0;
 
     const genderInfo = findGenderMarkers(rows);
     const hasGenderColumn = columnMap.gender !== undefined;
@@ -242,7 +448,7 @@ function parseLifters(doc: Document): Lifter[] {
     let currentAgeClassHeader = findAgeClassBeforeIndex(
       rows,
       dataStartIndex,
-      columnMap,
+      resolvedMap,
     );
     let currentEquipment: "raw" | "equipped" = "raw";
     if (!hasGenderColumn) {
@@ -255,7 +461,7 @@ function parseLifters(doc: Document): Lifter[] {
             rows,
             dataStartIndex,
             genderInfo.miehetIndex,
-            columnMap,
+            resolvedMap,
           )
         ) {
           defaultGender = "F";
@@ -274,35 +480,50 @@ function parseLifters(doc: Document): Lifter[] {
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
+      if (
+        !inFooterSection &&
+        (rowText.startsWith("ennätykset") ||
+          rowText.startsWith("tuomarit") ||
+          rowText.startsWith("jury") ||
+          rowText.includes("päätuomari"))
+      ) {
+        inFooterSection = true;
+      }
+      const isRepeatedHeader =
+        rowText.includes("nimi") &&
+        (rowText.includes("sij") || rowText.includes("seura")) &&
+        isHeaderRow(row);
+
       const ageClassFromRow = extractAgeClassFromText(rowText);
-      if (ageClassFromRow && isAgeClassHeaderRow(row, rowText, columnMap)) {
+      if (ageClassFromRow && isAgeClassHeaderRow(row, rowText, resolvedMap)) {
         currentAgeClassHeader = ageClassFromRow;
         currentGender = ageClassFromRow.startsWith("N") ? "F" : "M";
+        rowsDroppedExpected++;
         continue;
       }
 
-      const positionIndex = columnMap.position ?? 0;
-      const genderIndex = columnMap.gender;
-      const weightClassIndex = columnMap.weightClass ?? 2;
-      const bodyWeightIndex = columnMap.bodyWeight ?? 3;
-      const nameIndex = columnMap.name ?? 4;
-      const clubIndex = columnMap.club ?? 5;
-      const birthYearIndex = columnMap.birthYear;
-      const squatStart = columnMap.squatStart;
-      const benchStart = columnMap.benchStart ?? 10;
-      const deadliftStart = columnMap.deadliftStart;
-      const totalIndex = columnMap.total ?? 18;
-      const pointsIndex = columnMap.points ?? 19;
-
-      const minRequiredIndex = Math.max(
-        nameIndex,
-        clubIndex,
-        positionIndex,
-        genderIndex ?? -1,
-        weightClassIndex,
-        bodyWeightIndex,
-      );
-      if (cells.length <= minRequiredIndex) continue;
+      if (cells.length <= minRequiredIndex) {
+        const hasContent = cells.some((cell) => {
+          const text = (cell.textContent || "").trim();
+          return text && text !== "-";
+        });
+        const looksStructural =
+          !hasContent ||
+          inFooterSection ||
+          isHeaderRow(row) ||
+          extractEquipmentLabel(rowText) !== null ||
+          extractGenderLabel(rowText) !== null ||
+          rowText === "naiset" ||
+          rowText === "miehet" ||
+          rowText.includes("ennätykset") ||
+          rowText.includes("tuomari");
+        if (looksStructural) {
+          rowsDroppedExpected++;
+        } else {
+          dropRow(i, "fewer cells than expected", rowText);
+        }
+        continue;
+      }
 
       const nonEmptyCells = cells.filter((cell) => {
         const text = (cell.textContent || "").trim();
@@ -316,6 +537,7 @@ function parseLifters(doc: Document): Lifter[] {
         const equipmentFromLabel = extractEquipmentLabel(rowText);
         if (equipmentFromLabel) {
           currentEquipment = equipmentFromLabel;
+          rowsDroppedExpected++;
           continue;
         }
         const genderFromLabel = extractGenderLabel(rowText);
@@ -325,14 +547,17 @@ function parseLifters(doc: Document): Lifter[] {
           if (headerAgeClass) {
             currentAgeClassHeader = headerAgeClass;
           }
+          rowsDroppedExpected++;
           continue;
         }
         if (rowText === "naiset" || rowText === "women") {
           currentGender = "F";
+          rowsDroppedExpected++;
           continue;
         }
         if (rowText === "miehet" || rowText === "men") {
           currentGender = "M";
+          rowsDroppedExpected++;
           continue;
         }
       }
@@ -341,7 +566,14 @@ function parseLifters(doc: Document): Lifter[] {
       const nameText = cells[nameIndex]?.textContent?.trim() || "";
 
       // Skip empty names or division/gender headers
-      if (!nameText) continue;
+      if (!nameText) {
+        if (nonEmptyCells.length === 0 || inFooterSection || isRepeatedHeader) {
+          rowsDroppedExpected++;
+        } else {
+          dropRow(i, "empty name cell", rowText);
+        }
+        continue;
+      }
       const nameLower = nameText.toLowerCase();
       if (
         nameLower === "klassinen" ||
@@ -352,6 +584,7 @@ function parseLifters(doc: Document): Lifter[] {
         nameLower.includes("ennätykset") ||
         nameLower.includes("tuomari")
       ) {
+        rowsDroppedExpected++;
         continue;
       }
 
@@ -373,9 +606,12 @@ function parseLifters(doc: Document): Lifter[] {
       const positionText =
         cells[positionIndex]?.textContent?.trim().replace(".", "") || "";
       const position = parseInt(positionText) || 0;
+      const hasNumericPosition = position !== 0 || !!positionText.match(/^\d/);
 
-      // Skip if no valid position (likely not a lifter row)
-      if (position === 0 && !positionText.match(/^\d/)) continue;
+      if (!hasNumericPosition && (inFooterSection || isRepeatedHeader)) {
+        rowsDroppedExpected++;
+        continue;
+      }
 
       // Parse gender from column 1, fallback to section header
       const genderText =
@@ -431,6 +667,20 @@ function parseLifters(doc: Document): Lifter[] {
       const total = parseNumber(cells[totalIndex]?.textContent);
       const points = parseNumber(cells[pointsIndex]?.textContent);
 
+      // Keep DSQ / out-of-competition rows (position "-", "dsq", empty)
+      // as position 0 when they clearly carry lift data; dropping them
+      // silently loses real lifters
+      if (!hasNumericPosition) {
+        const hasLiftData =
+          total > 0 ||
+          [...squat, ...bench, ...deadlift].some((a) => a.weight > 0);
+        if (!/[a-zåäö]/i.test(name) || !hasLiftData) {
+          dropRow(i, "no numeric position", rowText);
+          continue;
+        }
+        keptNoPosition++;
+      }
+
       lifters.push({
         name,
         birthYear,
@@ -448,12 +698,160 @@ function parseLifters(doc: Document): Lifter[] {
         position,
       });
     }
+
+    const tableLifters = lifters.slice(tableLifterStart);
+    const checks = assessTable(tableLifters);
+    const confidence = tableConfidence(
+      tableLifters,
+      checks,
+      fallbacksUsed,
+      droppedRows.length,
+    );
+
+    tableReports.push({
+      tableIndex,
+      matched: true,
+      columnMap: { ...resolvedMap },
+      fallbacksUsed,
+      rowsParsed: tableLifters.length,
+      rowsDroppedExpected,
+      droppedRows,
+      checks,
+      confidence,
+    });
+
+    if (keptNoPosition > 0) {
+      issues.push({
+        severity: "info",
+        code: "kept_no_position",
+        message: `Table ${tableIndex}: ${keptNoPosition} lifter(s) without a numeric position kept as position 0 (DSQ/out of competition)`,
+        tableIndex,
+      });
+    }
+
+    if (confidence !== "ok") {
+      issues.push({
+        severity: confidence === "failed" ? "error" : "warning",
+        code:
+          checks.totalAgreementRate !== undefined &&
+          checks.totalAgreementRate < 0.9
+            ? "column_misalignment"
+            : "low_parse_confidence",
+        message: `Table ${tableIndex}: confidence ${confidence} (totals agree ${formatRate(checks.totalAgreementRate)}, sane names ${formatRate(checks.nameSanityRate)}${fallbacksUsed.length ? `, fallbacks: ${fallbacksUsed.join("; ")}` : ""})`,
+        tableIndex,
+      });
+    }
+    if (droppedRows.length > 0) {
+      issues.push({
+        severity: "warning",
+        code: "rows_dropped",
+        message: `Table ${tableIndex}: ${droppedRows.length} row(s) dropped unexpectedly (first: ${droppedRows[0].reason})`,
+        tableIndex,
+        snippet: droppedRows[0].snippet,
+      });
+    }
   }
 
-  return lifters;
+  return {
+    lifters,
+    tables: tableReports,
+    issues,
+    tablesSeen: tables.length,
+    tablesMatched,
+  };
 }
 
-type ColumnMap = {
+function formatRate(rate: number | undefined): string {
+  return rate === undefined ? "n/a" : `${Math.round(rate * 100)}%`;
+}
+
+/**
+ * Cross-checks that catch column misalignment: shifted columns destroy
+ * the total-vs-best-sum agreement immediately, and numeric text landing
+ * in the name column fails the letter test
+ */
+function assessTable(lifters: Lifter[]): TableReport["checks"] {
+  if (lifters.length === 0) return {};
+
+  const best = (attempts: [Attempt, Attempt, Attempt]) =>
+    Math.max(0, ...attempts.filter((a) => a.success).map((a) => a.weight));
+
+  let withTotal = 0;
+  let totalsAgree = 0;
+  let saneNames = 0;
+  let positionMonotonic = true;
+  let prevPosition = 0;
+
+  for (const lifter of lifters) {
+    if (lifter.total > 0) {
+      withTotal++;
+      const sum =
+        best(lifter.squat) + best(lifter.bench) + best(lifter.deadlift);
+      if (Math.abs(sum - lifter.total) < 0.011) totalsAgree++;
+    }
+
+    const nameSane = /[a-zåäö]/i.test(lifter.name);
+    const clubSane = lifter.club === "" || /[a-zåäö]/i.test(lifter.club);
+    if (nameSane && clubSane) saneNames++;
+
+    if (lifter.position > 0) {
+      if (lifter.position !== 1 && lifter.position < prevPosition) {
+        positionMonotonic = false;
+      }
+      prevPosition = lifter.position;
+    }
+  }
+
+  return {
+    totalAgreementRate: withTotal > 0 ? totalsAgree / withTotal : undefined,
+    nameSanityRate: saneNames / lifters.length,
+    positionMonotonic,
+  };
+}
+
+function tableConfidence(
+  lifters: Lifter[],
+  checks: TableReport["checks"],
+  fallbacksUsed: string[],
+  unexpectedDrops: number,
+): ParseConfidence {
+  if (lifters.length === 0) return "failed";
+  const agreement = checks.totalAgreementRate;
+  const nameSanity = checks.nameSanityRate;
+  if (
+    (agreement !== undefined && agreement < 0.5) ||
+    (nameSanity !== undefined && nameSanity < 0.8)
+  ) {
+    return "failed";
+  }
+  // A guessed positional map needs stronger corroboration than a
+  // header-derived one before its output is merely "suspect"
+  const usedLegacyMap = fallbacksUsed.some((note) =>
+    note.startsWith("legacy_positional_map"),
+  );
+  if (usedLegacyMap && agreement !== undefined && agreement < 0.8) {
+    return "failed";
+  }
+  // Attempts parsed but not a single total: a missing/misplaced total
+  // column would otherwise pass vacuously (agreement is undefined)
+  const hasLiftData = lifters.some((lifter) =>
+    [lifter.squat, lifter.bench, lifter.deadlift].some((attempts) =>
+      attempts.some((attempt) => attempt.weight > 0),
+    ),
+  );
+  if (
+    (agreement !== undefined && agreement < 0.9) ||
+    (agreement === undefined && hasLiftData) ||
+    checks.positionMonotonic === false ||
+    unexpectedDrops > 0 ||
+    fallbacksUsed.length > 0
+  ) {
+    return "suspect";
+  }
+  return "ok";
+}
+
+export type ColumnMap = {
   position?: number;
   gender?: number;
   weightClass?: number;
@@ -468,15 +866,36 @@ type ColumnMap = {
   points?: number;
 };
 
-function detectColumnMap(row: Element, subHeaderRow?: Element): ColumnMap {
-  const headerTexts = Array.from(row.querySelectorAll("th, td")).map((cell) =>
-    (cell.textContent || "").trim().toLowerCase(),
-  );
-  const subHeaderTexts = subHeaderRow
-    ? Array.from(subHeaderRow.querySelectorAll("th, td")).map((cell) =>
-        (cell.textContent || "").trim().toLowerCase(),
-      )
+/**
+ * Header cells use colspan (e.g. "Penkkipunnerrus" spanning attempts +
+ * best); indices must be expanded to line up with data columns
+ */
+function expandedHeaderTexts(row: Element): string[] {
+  const texts: string[] = [];
+  for (const cell of Array.from(row.querySelectorAll("th, td"))) {
+    texts.push((cell.textContent || "").trim().toLowerCase());
+    const colspan = parseInt(cell.getAttribute("colspan") || "1") || 1;
+    for (let i = 1; i < colspan; i++) texts.push("");
+  }
+  return texts;
+}
+
+export function detectColumnMap(
+  row: Element,
+  subHeaderRow?: Element,
+  fallbackNotes?: string[],
+): ColumnMap {
+  const headerTexts = expandedHeaderTexts(row);
+  // Newer SVNL pages have sub-header rows with only a handful of cells
+  // (visual alignment via the main header's colspans); their indices do
+  // not correspond to data columns and must not be trusted
+  const rawSubHeaderTexts = subHeaderRow
+    ? expandedHeaderTexts(subHeaderRow)
     : null;
+  const subHeaderTexts =
+    rawSubHeaderTexts && rawSubHeaderTexts.length >= headerTexts.length * 0.8
+      ? rawSubHeaderTexts
+      : null;
 
   const columnMap: ColumnMap = {};
 
@@ -511,11 +930,35 @@ function detectColumnMap(row: Element, subHeaderRow?: Element): ColumnMap {
       }
     }
 
-    if (text.includes("yhteistulos") || text.includes("tulos")) {
-      columnMap.total = index;
-    }
     if (text.includes("ipf") && text.includes("gl")) columnMap.points = index;
   });
+
+  // "Yhteistulos" is unambiguous; a bare "Tulos" also appears as the
+  // per-lift best column after each attempt triple, so only accept it
+  // when it sits beyond every detected attempt block
+  const yhteistulosIndex = lastIndexMatching(headerTexts, (text) =>
+    text.includes("yhteistulos"),
+  );
+  if (yhteistulosIndex !== undefined) {
+    columnMap.total = yhteistulosIndex;
+  } else {
+    const attemptBlockEnds = [
+      columnMap.squatStart,
+      columnMap.benchStart,
+      columnMap.deadliftStart,
+    ]
+      .filter((start): start is number => start !== undefined)
+      .map((start) => start + 3);
+    const tulosIndex = lastIndexMatching(headerTexts, (text) =>
+      text.includes("tulos"),
+    );
+    if (
+      tulosIndex !== undefined &&
+      attemptBlockEnds.every((end) => tulosIndex > end)
+    ) {
+      columnMap.total = tulosIndex;
+    }
+  }
 
   if (subHeaderTexts) {
     const squatHeaderIndex = headerTexts.findIndex(
@@ -587,6 +1030,7 @@ function detectColumnMap(row: Element, subHeaderRow?: Element): ColumnMap {
           i <= columnMap.deadliftStart + 3;
         if (!isSquatColumns && !isDeadliftColumns) {
           columnMap.benchStart = i;
+          fallbackNotes?.push("bench_guess_by_123");
           break;
         }
       }
@@ -758,9 +1202,15 @@ function extractEquipmentLabel(text: string): "raw" | "equipped" | null {
   return null;
 }
 
-function extractAgeClassFromText(text: string): string | null {
+export function extractAgeClassFromText(text: string): string | null {
   const trimmed = text.replace(/\s+/g, " ").trim().toUpperCase();
-  const match = trimmed.match(/([NM](?:14|18|23|40|50|60|70))/);
+  // Enumerated ages rather than [NM]\d{2}, which would collide with
+  // weight classes (N63, M74, ...). Digits may directly precede the age
+  // class ("KV63N40" = weight class + age class), so only a letter
+  // lookbehind guards against e.g. "SM40" matching
+  const match = trimmed.match(
+    /(?<![A-ZÅÄÖ])([NM](?:1[3-8]|23|4[05]|5[05]|6[05]|7[05]|80))/,
+  );
   return match ? match[1] : null;
 }
 
@@ -866,7 +1316,7 @@ function parseAttempts(
 /**
  * Parse a single attempt cell
  */
-function parseAttempt(cell: Element | undefined): Attempt {
+export function parseAttempt(cell: Element | undefined): Attempt {
   if (!cell) return { weight: 0, success: false };
 
   const text = cell.textContent?.trim().replace(/\s/g, "") || "";
@@ -876,10 +1326,25 @@ function parseAttempt(cell: Element | undefined): Attempt {
 
   const weight = Math.abs(parseNumber(text));
 
-  // Failed attempts have strikethrough styling
-  const hasStrikethrough = cell.innerHTML?.includes("line-through") || false;
+  return { weight, success: weight > 0 && !isFailedAttempt(cell, text) };
+}
 
-  return { weight, success: weight > 0 && !hasStrikethrough };
+/**
+ * SVNL has marked failed attempts with inline line-through styles, but a
+ * styling change would silently flip every failure to a success — so also
+ * accept semantic strikethrough tags, strike-ish class names, and the
+ * negative-number convention used by some result systems
+ */
+function isFailedAttempt(cell: Element, text: string): boolean {
+  const html = (cell.innerHTML || "").toLowerCase();
+  if (html.includes("line-through")) return true;
+  if (cell.querySelector("s, del, strike")) return true;
+  if ((cell.getAttribute("class") || "").toLowerCase().includes("strike")) {
+    return true;
+  }
+  if (cell.querySelector('[class*="strike"]')) return true;
+  if (/^-\d/.test(text)) return true;
+  return false;
 }
 
 /**
@@ -890,14 +1355,15 @@ function parseNumber(text: string | null | undefined): number {
   return parseFloat(text.trim().replace(",", ".")) || 0;
 }
 
-function parseBirthYear(text: string | null | undefined): number {
+export function parseBirthYear(text: string | null | undefined): number {
   if (!text) return 0;
   const trimmed = text.trim();
   const match = trimmed.match(/\d{2,4}/);
   if (!match) return 0;
   let year = parseInt(match[0]) || 0;
   if (year >= 0 && year < 100) {
-    year += year <= 25 ? 2000 : 1900;
+    const pivot = new Date().getFullYear() % 100;
+    year += year <= pivot ? 2000 : 1900;
   }
   return year;
 }

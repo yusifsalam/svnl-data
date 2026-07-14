@@ -4,10 +4,12 @@ import type { CompetitionResult } from "../../cli/types";
 
 export function ScrapeCompleteView({
   results,
+  failedCount,
   progress,
   onBack,
 }: {
   results: CompetitionResult[];
+  failedCount: number;
   progress: string;
   onBack: () => void;
 }) {
@@ -26,6 +28,9 @@ export function ScrapeCompleteView({
   let totalValidatedLifters = 0;
   let totalLiftersWithWarnings = 0;
   let totalWarnings = 0;
+  let totalErrors = 0;
+  const parseProblems: string[] = [];
+  const seenCompetitions = new Set<string>();
 
   for (const result of results) {
     const validation = result.metadata?.validation;
@@ -33,6 +38,23 @@ export function ScrapeCompleteView({
       totalValidatedLifters += validation.totalLifters;
       totalLiftersWithWarnings += validation.liftersWithWarnings;
       totalWarnings += validation.allWarnings.length;
+      totalErrors += validation.allWarnings.filter(
+        (w) => w.severity === "error",
+      ).length;
+    }
+
+    const report = result.metadata?.parseReport;
+    const competitionId =
+      result.metadata?.competitionId || result.competition.id;
+    if (
+      report &&
+      report.confidence !== "ok" &&
+      !seenCompetitions.has(competitionId)
+    ) {
+      seenCompetitions.add(competitionId);
+      parseProblems.push(
+        `${competitionId}: parse confidence ${report.confidence}`,
+      );
     }
   }
 
@@ -50,16 +72,36 @@ export function ScrapeCompleteView({
         </Text>
       </Box>
 
+      {failedCount > 0 && (
+        <Box marginTop={1}>
+          <Text color="red">
+            ✗ {failedCount} competition{failedCount === 1 ? "" : "s"} failed to
+            scrape (see log above)
+          </Text>
+        </Box>
+      )}
+
+      {parseProblems.length > 0 && (
+        <Box marginTop={1} flexDirection="column">
+          {parseProblems.map((problem) => (
+            <Text key={problem} color="red">
+              ✗ {problem} — raw HTML in ~/.svnl-scraper/debug/
+            </Text>
+          ))}
+        </Box>
+      )}
+
       {totalValidatedLifters > 0 && (
         <Box marginTop={1}>
-          {totalLiftersWithWarnings === 0 ? (
+          {totalWarnings === 0 ? (
             <Text color="green">
               ✓ Validation: {totalValidatedLifters} lifters passed all checks
             </Text>
           ) : (
-            <Text color="yellow">
+            <Text color={totalErrors > 0 ? "red" : "yellow"}>
               ⚠ Validation: {totalLiftersWithWarnings}/{totalValidatedLifters}{" "}
-              lifters have warnings ({totalWarnings} total)
+              lifters have warnings ({totalWarnings} total
+              {totalErrors > 0 ? `, ${totalErrors} errors` : ""})
             </Text>
           )}
         </Box>

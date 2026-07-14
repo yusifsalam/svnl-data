@@ -16,7 +16,7 @@ export function ScrapingView({
   forceMode: boolean;
   progress: string;
   onProgress: (msg: string) => void;
-  onComplete: (results: CompetitionResult[]) => void;
+  onComplete: (results: CompetitionResult[], failedCount: number) => void;
   onError: (error: string) => void;
 }) {
   const [started, setStarted] = useState(false);
@@ -25,7 +25,7 @@ export function ScrapingView({
     if (!started) {
       setStarted(true);
       scrapeCompetitions(competitions, { onProgress, force: forceMode })
-        .then(onComplete)
+        .then(({ results, failedCount }) => onComplete(results, failedCount))
         .catch((e) => onError(e instanceof Error ? e.message : String(e)));
     }
   }, [started]);

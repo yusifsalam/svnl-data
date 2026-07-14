@@ -57,6 +57,7 @@ function App() {
   const [error, setError] = useState("");
   const [scrapeStartedAt, setScrapeStartedAt] = useState<number | null>(null);
   const [scrapeResults, setScrapeResults] = useState<CompetitionResult[]>([]);
+  const [scrapeFailedCount, setScrapeFailedCount] = useState(0);
 
   useEffect(() => {
     loadCache();
@@ -199,7 +200,7 @@ function App() {
           forceMode={forceMode}
           progress={progress}
           onProgress={setProgress}
-          onComplete={async (results) => {
+          onComplete={async (results, failedCount) => {
             const startedAt = scrapeStartedAt ?? Date.now();
             const logPath = join(logDir, "svnl-log.jsonl");
             if (outputMode === "combined") {
@@ -246,6 +247,7 @@ function App() {
               logDir,
             );
             setScrapeResults(results);
+            setScrapeFailedCount(failedCount);
             setScreen("scrape-complete");
           }}
           onError={(e) => {
@@ -258,6 +260,7 @@ function App() {
       {screen === "scrape-complete" && (
         <ScrapeCompleteView
           results={scrapeResults}
+          failedCount={scrapeFailedCount}
           progress={progress}
           onBack={() => {
             setSelectedIds(new Set());
@@ -265,6 +268,7 @@ function App() {
             setScrapeSelection([]);
             setScrapeStartedAt(null);
             setScrapeResults([]);
+            setScrapeFailedCount(0);
             setScreen("menu");
           }}
         />

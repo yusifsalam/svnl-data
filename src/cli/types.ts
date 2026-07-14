@@ -37,7 +37,7 @@ export interface ValidationSummary {
   liftersWithWarnings: number;
   warningsByRule: Record<string, number>;
   allWarnings: Array<{
-    severity: "warning";
+    severity: "warning" | "error";
     rule: string;
     message: string;
     lifterName?: string;
@@ -46,12 +46,49 @@ export interface ValidationSummary {
   }>;
 }
 
+export type ParseConfidence = "ok" | "suspect" | "failed";
+
+export interface ParseIssue {
+  severity: "info" | "warning" | "error";
+  code: string;
+  message: string;
+  tableIndex?: number;
+  snippet?: string;
+}
+
+export interface TableReport {
+  tableIndex: number;
+  matched: boolean;
+  skippedReason?: string;
+  columnMap?: Record<string, number | undefined>;
+  fallbacksUsed: string[];
+  rowsParsed: number;
+  rowsDroppedExpected: number;
+  droppedRows: Array<{ rowIndex: number; reason: string; snippet: string }>;
+  checks: {
+    totalAgreementRate?: number;
+    nameSanityRate?: number;
+    positionMonotonic?: boolean;
+  };
+  confidence: ParseConfidence;
+}
+
+export interface ParseReport {
+  tablesSeen: number;
+  tablesMatched: number;
+  tables: TableReport[];
+  issues: ParseIssue[];
+  liftersParsed: number;
+  confidence: ParseConfidence;
+}
+
 export interface ScrapeMetadata {
   competitionId: string;
   skipped: boolean;
   cached: boolean;
   hashMatch: boolean;
   validation?: ValidationSummary;
+  parseReport?: ParseReport;
 }
 
 export interface CompetitionResult {

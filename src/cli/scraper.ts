@@ -1,10 +1,16 @@
 import puppeteer from "puppeteer-core";
 import { parseCompetitionPage } from "./parser";
-import type { Competition, CompetitionResult, ProgressCallback } from "./types";
+import type {
+  Competition,
+  CompetitionResult,
+  ParseReport,
+  ProgressCallback,
+} from "./types";
 import {
   extractCompetitionTables,
   computeHash,
   readHtmlCache,
+  writeDebugArtifact,
   writeHtmlCache,
   shouldScrape as shouldScrapeCheck,
 } from "./cache";
@@ -23,6 +29,15 @@ interface ScrapeOptions {
   onProgress?: ProgressCallback;
   force?: boolean;
   useCache?: boolean;
+}
+
+// Distinguishes a parser failure from a fetch/cache failure so callers can
+// count them separately (parse problems vs. competitions that never loaded)
+export class ScrapeParseError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "ScrapeParseError";
+  }
 }
 
 /**
@@ -179,6 +194,7 @@ export async function scrapeCompetition(
   let tableHtml: string;
   let skipped = false;
   let usedCache = false;
+  let extractionError: string | null = null;
 
   try {
     tableHtml = extractCompetitionTables(html);
@@ -198,31 +214,69 @@ export async function scrapeCompetition(
     }
 
     if (!skipped) {
-      const hash = computeHash(tableHtml);
-      await writeHtmlCache(competition.id, tableHtml, hash);
       onProgress?.("Parsing results...");
     }
   } catch (error) {
-    onProgress?.(`Warning: Cache error, parsing full HTML`);
+    extractionError = error instanceof Error ? error.message : String(error);
+    onProgress?.(
+      `Warning: table extraction failed (${extractionError}), parsing full HTML`,
+    );
     tableHtml = html;
   }
 
-  const result = parseCompetitionPage(tableHtml, competition);
+  let results: CompetitionResult[];
+  let report: ParseReport;
+  try {
+    ({ results, report } = parseCompetitionPage(tableHtml, competition));
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const debugPath = await writeDebugArtifact(competition.id, html, {
+      issues: [{ severity: "error", code: "parser_exception", message: msg }],
+    });
+    onProgress?.(`PARSE ERROR: ${msg} — raw HTML saved to ${debugPath}`);
+    throw new ScrapeParseError(msg, { cause: error });
+  }
 
-  const lifterCount = result.reduce(
-    (sum, entry) => sum + entry.lifters.length,
-    0,
-  );
-  onProgress?.(`Found ${lifterCount} lifters`);
+  // Cache only pages that extracted cleanly and parsed with usable confidence,
+  // so a failed-confidence or unparseable page can never overwrite the last
+  // good cache and hide itself behind the hash-skip on the next run
+  if (!skipped && !extractionError && report.confidence !== "failed") {
+    const hash = computeHash(tableHtml);
+    await writeHtmlCache(competition.id, tableHtml, hash);
+  }
 
-  result.forEach((r) => {
-    const validation = validateCompetitionResult(r);
+  if (extractionError) {
+    report.issues.push({
+      severity: "warning",
+      code: "table_extraction_failed",
+      message: extractionError,
+    });
+  }
+
+  onProgress?.(`Found ${report.liftersParsed} lifters`);
+
+  if (report.confidence !== "ok") {
+    const debugPath = await writeDebugArtifact(competition.id, html, report);
+    const label = report.confidence === "failed" ? "PARSE ERROR" : "PARSE WARNING";
+    const detail = report.issues
+      .filter((issue) => issue.severity !== "info")
+      .map((issue) => issue.message)
+      .slice(0, 3)
+      .join("; ");
+    onProgress?.(
+      `${label}: ${competition.id} confidence=${report.confidence} (${detail}) — raw HTML saved to ${debugPath}`,
+    );
+  }
+
+  results.forEach((r) => {
+    const validation = validateCompetitionResult(r, report);
     r.metadata = {
       competitionId: competition.id,
       skipped,
       cached: usedCache,
       hashMatch: skipped,
       validation,
+      parseReport: report,
     };
 
     if (validation.liftersWithWarnings > 0) {
@@ -232,7 +286,7 @@ export async function scrapeCompetition(
     }
   });
 
-  return result;
+  return results;
 }
 
 /**
@@ -241,11 +295,17 @@ export async function scrapeCompetition(
 export async function scrapeCompetitions(
   competitions: Competition[],
   options: ScrapeOptions & { delayMs?: number } = {},
-): Promise<CompetitionResult[]> {
+): Promise<{
+  results: CompetitionResult[];
+  failedCount: number;
+  parseErrorCount: number;
+}> {
   const { onProgress, delayMs = 2000, force = false } = options;
   const results: CompetitionResult[] = [];
   let skippedCount = 0;
   let scrapedCount = 0;
+  let failedCount = 0;
+  let parseErrorCount = 0;
 
   for (let i = 0; i < competitions.length; i++) {
     const comp = competitions[i];
@@ -262,6 +322,9 @@ export async function scrapeCompetitions(
       results.push(...result);
 
       const metadata = result[0]?.metadata;
+      if (metadata?.parseReport?.confidence === "failed") {
+        parseErrorCount++;
+      }
       if (metadata?.skipped) {
         skippedCount++;
       } else {
@@ -269,6 +332,10 @@ export async function scrapeCompetitions(
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+      failedCount++;
+      // A parser exception is a parse problem, not a load failure; fetch/cache
+      // errors count only toward failedCount
+      if (error instanceof ScrapeParseError) parseErrorCount++;
       onProgress?.(`Error: ${msg}`);
     }
 
@@ -278,13 +345,14 @@ export async function scrapeCompetitions(
     }
   }
 
-  if (!force && (skippedCount > 0 || scrapedCount > 0)) {
-    onProgress?.(
-      `Summary: ${scrapedCount} scraped, ${skippedCount} skipped (unchanged)`,
-    );
+  if (skippedCount > 0 || scrapedCount > 0 || failedCount > 0) {
+    const parts = [`${scrapedCount} scraped`, `${skippedCount} skipped`];
+    if (failedCount > 0) parts.push(`${failedCount} FAILED`);
+    if (parseErrorCount > 0) parts.push(`${parseErrorCount} PARSE ERRORS`);
+    onProgress?.(`Summary: ${parts.join(", ")}`);
   }
 
-  return results;
+  return { results, failedCount, parseErrorCount };
 }
 
 /**

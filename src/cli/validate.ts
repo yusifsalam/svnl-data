@@ -1,7 +1,7 @@
-import type { Attempt, CompetitionResult, Lifter } from "./types";
+import type { Attempt, CompetitionResult, Lifter, ParseReport } from "./types";
 
 export interface ValidationWarning {
-  severity: "warning";
+  severity: "warning" | "error";
   rule: string;
   message: string;
   lifterName?: string;
@@ -18,11 +18,14 @@ export interface ValidationSummary {
 
 export function validateCompetitionResult(
   result: CompetitionResult,
+  parseReport?: ParseReport,
 ): ValidationSummary {
   const warnings: ValidationWarning[] = [];
   let liftersWithWarnings = 0;
 
   const eventType = result.competition.eventType || "sbd";
+
+  warnings.push(...validateParseHealth(result, parseReport));
 
   for (const lifter of result.lifters) {
     const lifterWarnings = validateLifter(
@@ -78,6 +81,47 @@ export function validateLifter(
   for (const warning of progressionWarnings) {
     warning.competitionId = competitionId;
     warnings.push(warning);
+  }
+
+  return warnings;
+}
+
+/**
+ * Structural checks that flag likely mis-parses (as opposed to bad
+ * source data): low parse confidence and empty results
+ */
+function validateParseHealth(
+  result: CompetitionResult,
+  parseReport?: ParseReport,
+): ValidationWarning[] {
+  const warnings: ValidationWarning[] = [];
+
+  if (parseReport && parseReport.confidence !== "ok") {
+    const detail = parseReport.issues
+      .filter((issue) => issue.severity !== "info")
+      .map((issue) => issue.message)
+      .slice(0, 3)
+      .join("; ");
+    warnings.push({
+      severity: parseReport.confidence === "failed" ? "error" : "warning",
+      rule: "parse_confidence",
+      message: `Parse confidence ${parseReport.confidence}: ${detail || "see parse report"}`,
+      competitionId: result.competition.id,
+      details: {
+        confidence: parseReport.confidence,
+        tablesSeen: parseReport.tablesSeen,
+        tablesMatched: parseReport.tablesMatched,
+      },
+    });
+  }
+
+  if (result.lifters.length === 0) {
+    warnings.push({
+      severity: "error",
+      rule: "zero_lifters",
+      message: "No lifters parsed from competition page",
+      competitionId: result.competition.id,
+    });
   }
 
   return warnings;
