@@ -11,4 +11,5 @@ public struct CliEventData: Codable {
     public let outputPaths: [String]?
     public let competitions: Int?
     public let lifters: Int?
+    public let parseErrors: Int?
 }

@@ -131,12 +131,20 @@ final class ScraperViewModel: ObservableObject {
                 errorCount += 1
             }
         case "complete":
-            statusMessage = "Scraping complete"
+            let parseErrors = event.data?.parseErrors ?? 0
+            if parseErrors > 0 {
+                let noun = parseErrors == 1 ? "competition" : "competitions"
+                statusMessage = "Scraping complete — \(parseErrors) \(noun) with parse errors (see ~/.svnl-scraper/debug/)"
+            } else {
+                statusMessage = "Scraping complete"
+            }
             showPreview = true
             previewToken = UUID()
             let successful = event.data?.competitions
             let lifters = event.data?.lifters
-            let failed = errorCount
+            // errorCount = competitions that never loaded; parseErrors = pages
+            // whose data parsed with failed confidence. Both are failures.
+            let failed = errorCount + parseErrors
             if let successful = successful {
                 completedCount = successful
             } else if totalCompetitions > 0 {
