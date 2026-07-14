@@ -54,3 +54,4 @@ logs/
 
 _legacy/
 samples/
+tests/golden/

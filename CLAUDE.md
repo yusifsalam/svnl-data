@@ -25,6 +25,7 @@ bun run cli scrape <ids...> --force     # Force re-scrape (bypass cache)
 bun run cli scrape <ids...> --validate  # Show validation warnings
 bun run cli scrape-all                  # Scrape all cached competitions
 bun run cli scrape-all --force          # Force re-scrape all (bypass cache)
+bun run cli debug-dump <id|url>         # Save page HTML as fixture candidate + print parse report
 
 # Run TUI
 bun run tui
@@ -32,8 +33,9 @@ bun run tui
 # Build standalone CLI binary
 bun run build:cli
 
-# Run tests
+# Run tests (golden fixtures in tests/golden/, real SVNL pages in samples/)
 bun test
+UPDATE_GOLDEN=1 bun test                # Regenerate goldens after an intended parser change
 ```
 
 ## Architecture
@@ -107,11 +109,15 @@ Avoid unnecessary comments. Code should be self-documenting through clear naming
 
 The parser handles SVNL table format variations:
 
-1. Find header row containing "Nimi", "Seura", etc.
-2. Map columns dynamically based on header text
-3. Detect attempt columns ("1.", "2.", "3." sequences)
-4. Parse lifter rows, skip division headers
-5. Throw clear error if table format unrecognized
+1. Find header row via `isResultsTable` (shared with cache.ts): "Nimi" + "Seura"/"Sarja", or a row naming 2+ lifts
+2. Map columns dynamically from header text, expanding colspan so header indices line up with data columns
+3. Detect attempt columns ("1.", "2.", "3." sequences); sub-header indices are only trusted when the sub-header is column-aligned (newer SVNL pages have short unaligned sub-headers)
+4. Parse lifter rows, skip division headers; DSQ rows (non-numeric position) are kept with position 0
+5. Never guess silently: every parse produces a `ParseReport` (tables matched/skipped, column map used, fallbacks, dropped rows, cross-checks). Low confidence surfaces as an error and saves the raw page to `~/.svnl-scraper/debug/` — the scrape still emits data, loudly flagged
+
+**Mis-parse detection** (`assessTable`): recomputed best-sum vs total agreement rate (column shift destroys it), name/club letter sanity, position monotonicity. `failed` < 50% agreement or < 80% sane names; `suspect` < 90% agreement or any fallback used.
+
+**When a page breaks the parser**: `bun run cli debug-dump <id>` saves the HTML to `samples/`, fix the parser, then `UPDATE_GOLDEN=1 bun test` to pin the fixed behavior. `samples/` and `tests/golden/` are deliberately gitignored (real SVNL pages, kept locally); fixture tests skip gracefully where they are absent. Mutation drills in `tests/mutations.test.ts` enforce the invariant: correct parse or loud failure, never silent wrong data.
 
 ## Validation Strategy
 
@@ -122,8 +128,11 @@ Validation runs automatically after parsing and checks:
 3. **Reasonable ranges** - Checks weights 20-500kg, body weight 30-200kg
 4. **Attempt progression** - Validates successful attempts don't decrease
 
-Validation is warnings-only (never fails the scrape). Results are attached to metadata
-and can be displayed with `--validate` flag or in TUI completion screen.
+Additionally, structural rules flag likely mis-parses (severity "error"): `parse_confidence`
+(from the ParseReport) and `zero_lifters`.
+
+Validation never fails the scrape (exit 0, data still written), but parse errors are always
+printed even without `--validate`. Details show with `--validate` or in the TUI completion screen.
 
 ## SwiftUI App
 
