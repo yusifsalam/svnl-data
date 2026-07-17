@@ -136,7 +136,10 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
       const locationOnly = extractLocationFromText(lastPart, dateOnly);
       if (locationOnly) {
         location = locationOnly;
-      } else if (parts.length >= 3) {
+      } else if (
+        parts.length >= 3 &&
+        !looksLikeCompetitionName(parts[parts.length - 2])
+      ) {
         location = parts[parts.length - 2];
       }
     }
@@ -184,6 +187,27 @@ function parseEventInfo(doc: Document, competition: Competition): Competition {
     location: location || undefined,
     category,
   };
+}
+
+// The segment before the date is usually a city, but some titles omit the
+// city and that slot is event-name text instead (e.g. "LIKE, Klassisen
+// voimanoston masters SM-kilpailut, 5.-7.6.2026"). Competition keywords
+// mark it as name, not location; Finnish city names never contain them.
+function looksLikeCompetitionName(part: string): boolean {
+  const text = part.toLowerCase();
+  return [
+    "voimanost",
+    "penkkipunnerrus",
+    "kilpailu",
+    "klassi",
+    "kansallinen",
+    "jäsenten",
+    "mästerskap",
+    "styrkelyft",
+    "masters",
+    "mestaruus",
+    "sm-",
+  ].some((keyword) => text.includes(keyword));
 }
 
 function cleanDate(value: string): string {
