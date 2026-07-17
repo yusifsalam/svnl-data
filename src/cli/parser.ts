@@ -511,38 +511,17 @@ function parseLifters(doc: Document): LiftersOutcome {
         continue;
       }
 
-      if (cells.length <= minRequiredIndex) {
-        const hasContent = cells.some((cell) => {
-          const text = (cell.textContent || "").trim();
-          return text && text !== "-";
-        });
-        const looksStructural =
-          !hasContent ||
-          inFooterSection ||
-          isHeaderRow(row) ||
-          extractEquipmentLabel(rowText) !== null ||
-          extractGenderLabel(rowText) !== null ||
-          rowText === "naiset" ||
-          rowText === "miehet" ||
-          rowText.includes("ennätykset") ||
-          rowText.includes("tuomari");
-        if (looksStructural) {
-          rowsDroppedExpected++;
-        } else {
-          dropRow(i, "fewer cells than expected", rowText);
-        }
-        continue;
-      }
-
       const nonEmptyCells = cells.filter((cell) => {
         const text = (cell.textContent || "").trim();
         return text && text !== "-";
       });
+      // Section-header rows carry a single label cell (gender/age class or
+      // equipment), often as one colspan cell — so they have fewer cells
+      // than minRequiredIndex. Their state update must run before the
+      // structural-drop check below; otherwise the gender/equipment switch
+      // is silently lost and every following lifter inherits the previous
+      // section's gender (masters meets label sections "N40"/"M40"/...)
       if (nonEmptyCells.length === 1) {
-        const rowText = (row.textContent || "")
-          .replace(/\s+/g, " ")
-          .trim()
-          .toLowerCase();
         const equipmentFromLabel = extractEquipmentLabel(rowText);
         // English pages combine gender and equipment in one header cell
         // ("Men equipped"); "women" must be tested before "men" since it
@@ -574,6 +553,29 @@ function parseLifters(doc: Document): LiftersOutcome {
           rowsDroppedExpected++;
           continue;
         }
+      }
+
+      if (cells.length <= minRequiredIndex) {
+        const hasContent = cells.some((cell) => {
+          const text = (cell.textContent || "").trim();
+          return text && text !== "-";
+        });
+        const looksStructural =
+          !hasContent ||
+          inFooterSection ||
+          isHeaderRow(row) ||
+          extractEquipmentLabel(rowText) !== null ||
+          extractGenderLabel(rowText) !== null ||
+          rowText === "naiset" ||
+          rowText === "miehet" ||
+          rowText.includes("ennätykset") ||
+          rowText.includes("tuomari");
+        if (looksStructural) {
+          rowsDroppedExpected++;
+        } else {
+          dropRow(i, "fewer cells than expected", rowText);
+        }
+        continue;
       }
 
       // Get name from column
