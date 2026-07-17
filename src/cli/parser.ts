@@ -265,16 +265,24 @@ export function isResultsTable(rows: Element[]): {
   for (let i = 0; i < rows.length; i++) {
     const text = rows[i].textContent?.toLowerCase() || "";
     if (
-      text.includes("nimi") &&
-      (text.includes("seura") || text.includes("sarja"))
+      (text.includes("nimi") || text.includes("name")) &&
+      (text.includes("seura") ||
+        text.includes("sarja") ||
+        text.includes("club") ||
+        text.includes("class"))
     ) {
       return { match: true, headerRowIndex: i };
     }
   }
   for (let i = 0; i < rows.length; i++) {
     const text = rows[i].textContent?.toLowerCase() || "";
-    const liftHeaderCount = ["jalkakyykky", "penkkipunnerrus", "maastanosto"]
-      .filter((lift) => text.includes(lift)).length;
+    const liftHeaderCount = Math.max(
+      ["jalkakyykky", "penkkipunnerrus", "maastanosto"].filter((lift) =>
+        text.includes(lift),
+      ).length,
+      ["squat", "bench", "deadlift"].filter((lift) => text.includes(lift))
+        .length,
+    );
     if (liftHeaderCount >= 2) {
       return { match: true, headerRowIndex: i };
     }
@@ -485,7 +493,8 @@ function parseLifters(doc: Document): LiftersOutcome {
         (rowText.startsWith("ennätykset") ||
           rowText.startsWith("tuomarit") ||
           rowText.startsWith("jury") ||
-          rowText.includes("päätuomari"))
+          rowText.includes("päätuomari") ||
+          rowText.includes("referee"))
       ) {
         inFooterSection = true;
       }
@@ -535,8 +544,18 @@ function parseLifters(doc: Document): LiftersOutcome {
           .trim()
           .toLowerCase();
         const equipmentFromLabel = extractEquipmentLabel(rowText);
+        // English pages combine gender and equipment in one header cell
+        // ("Men equipped"); "women" must be tested before "men" since it
+        // contains it as a substring
+        const sectionGender: "M" | "F" | null =
+          rowText === "naiset" || rowText.includes("women")
+            ? "F"
+            : rowText === "miehet" || rowText.includes("men")
+              ? "M"
+              : null;
         if (equipmentFromLabel) {
           currentEquipment = equipmentFromLabel;
+          if (sectionGender) currentGender = sectionGender;
           rowsDroppedExpected++;
           continue;
         }
@@ -550,13 +569,8 @@ function parseLifters(doc: Document): LiftersOutcome {
           rowsDroppedExpected++;
           continue;
         }
-        if (rowText === "naiset" || rowText === "women") {
-          currentGender = "F";
-          rowsDroppedExpected++;
-          continue;
-        }
-        if (rowText === "miehet" || rowText === "men") {
-          currentGender = "M";
+        if (sectionGender) {
+          currentGender = sectionGender;
           rowsDroppedExpected++;
           continue;
         }
@@ -619,7 +633,7 @@ function parseLifters(doc: Document): LiftersOutcome {
           ? cells[genderIndex]?.textContent?.trim().toUpperCase() || ""
           : "";
       let gender: "M" | "F";
-      if (genderText.startsWith("N")) {
+      if (genderText.startsWith("N") || genderText.startsWith("W")) {
         gender = "F";
       } else if (genderText.startsWith("M")) {
         gender = "M";
@@ -900,37 +914,54 @@ export function detectColumnMap(
   const columnMap: ColumnMap = {};
 
   headerTexts.forEach((text, index) => {
-    if (text.includes("sij")) columnMap.position = index;
-    if (text.includes("m/n") || text.includes("sukupuoli"))
+    if (text.includes("sij") || text === "place") columnMap.position = index;
+    if (text.includes("m/n") || text.includes("sukupuoli") || text === "m/w")
       columnMap.gender = index;
-    if (text.includes("sarja")) columnMap.weightClass = index;
-    if (text.includes("paino") && !text.includes("kk"))
+    if (text.includes("sarja") || text === "class") columnMap.weightClass = index;
+    if ((text.includes("paino") && !text.includes("kk")) || text === "bwt")
       columnMap.bodyWeight = index;
-    if (text.includes("nimi")) columnMap.name = index;
-    if (text === "sv" || text.includes("syntymävuosi")) {
+    if (text.includes("nimi") || text.includes("name")) columnMap.name = index;
+    if (text === "sv" || text === "by" || text.includes("syntymävuosi")) {
       columnMap.birthYear = index;
     }
-    if (text.includes("seura")) columnMap.club = index;
+    if (text.includes("seura") || text.includes("club")) columnMap.club = index;
 
-    if (text.includes("jalkakyykky") || text.startsWith("jk")) {
+    if (
+      text.includes("jalkakyykky") ||
+      text.startsWith("jk") ||
+      text.includes("squat")
+    ) {
       if (columnMap.squatStart === undefined) {
         columnMap.squatStart = numberedAttemptStart(headerTexts, index);
       }
     }
 
-    if (text.includes("penkkipunnerrus") || text.startsWith("pp")) {
+    if (
+      text.includes("penkkipunnerrus") ||
+      text.startsWith("pp") ||
+      text.includes("bench")
+    ) {
       if (columnMap.benchStart === undefined) {
         columnMap.benchStart = numberedAttemptStart(headerTexts, index);
       }
     }
 
-    if (text.includes("maastanosto") || text.startsWith("mn")) {
+    if (
+      text.includes("maastanosto") ||
+      text.startsWith("mn") ||
+      text.includes("deadlift")
+    ) {
       if (columnMap.deadliftStart === undefined) {
         columnMap.deadliftStart = numberedAttemptStart(headerTexts, index);
       }
     }
 
-    if (text.includes("ipf") && text.includes("gl")) columnMap.points = index;
+    if (
+      (text.includes("ipf") && text.includes("gl")) ||
+      text.includes("pisteet") ||
+      text === "points"
+    )
+      columnMap.points = index;
   });
 
   // "Yhteistulos" is unambiguous; a bare "Tulos" also appears as the
@@ -960,15 +991,33 @@ export function detectColumnMap(
     }
   }
 
+  // English pages label the grand total "Total" (the per-lift best column
+  // stays "Tulos"), so it never matches the tulos logic above
+  if (columnMap.total === undefined) {
+    const totalIndex = lastIndexMatching(headerTexts, (text) =>
+      text.includes("total"),
+    );
+    if (totalIndex !== undefined) columnMap.total = totalIndex;
+  }
+
   if (subHeaderTexts) {
     const squatHeaderIndex = headerTexts.findIndex(
-      (text) => text.includes("jalkakyykky") || text.startsWith("jk"),
+      (text) =>
+        text.includes("jalkakyykky") ||
+        text.startsWith("jk") ||
+        text.includes("squat"),
     );
     const benchHeaderIndex = headerTexts.findIndex(
-      (text) => text.includes("penkkipunnerrus") || text.startsWith("pp"),
+      (text) =>
+        text.includes("penkkipunnerrus") ||
+        text.startsWith("pp") ||
+        text.includes("bench"),
     );
     const deadliftHeaderIndex = headerTexts.findIndex(
-      (text) => text.includes("maastanosto") || text.startsWith("mn"),
+      (text) =>
+        text.includes("maastanosto") ||
+        text.startsWith("mn") ||
+        text.includes("deadlift"),
     );
 
     let lastAttemptEnd = 0;
@@ -997,7 +1046,10 @@ export function detectColumnMap(
 
     const pointsIndex = subHeaderTexts.findIndex(
       (text) =>
-        text.includes("ipf") || text.includes("gl") || text.includes("pisteet"),
+        text.includes("ipf") ||
+        text.includes("gl") ||
+        text.includes("pisteet") ||
+        text.includes("points"),
     );
     if (pointsIndex !== -1) columnMap.points = pointsIndex;
     if (pointsIndex > 0) {
@@ -1037,14 +1089,14 @@ export function detectColumnMap(
     }
   }
 
-  const hasSquatHeader = headerTexts.some((text) =>
-    text.includes("jalkakyykky"),
+  const hasSquatHeader = headerTexts.some(
+    (text) => text.includes("jalkakyykky") || text.includes("squat"),
   );
-  const hasDeadliftHeader = headerTexts.some((text) =>
-    text.includes("maastanosto"),
+  const hasDeadliftHeader = headerTexts.some(
+    (text) => text.includes("maastanosto") || text.includes("deadlift"),
   );
-  const hasBenchHeader = headerTexts.some((text) =>
-    text.includes("penkkipunnerrus"),
+  const hasBenchHeader = headerTexts.some(
+    (text) => text.includes("penkkipunnerrus") || text.includes("bench"),
   );
   if (hasBenchHeader && !hasSquatHeader && !hasDeadliftHeader) {
     columnMap.squatStart = undefined;
@@ -1117,7 +1169,13 @@ function isHeaderRow(row: Element): boolean {
         text.includes("maastanosto") ||
         text.startsWith("jk") ||
         text.startsWith("pp") ||
-        text.startsWith("mn"),
+        text.startsWith("mn") ||
+        text === "place" ||
+        text === "club" ||
+        text.includes("squat") ||
+        text.includes("bench") ||
+        text.includes("deadlift") ||
+        text.includes("tulos"),
     )
   ) {
     return true;
@@ -1189,7 +1247,7 @@ function extractGenderLabel(text: string): "M" | "F" | null {
 function extractEquipmentLabel(text: string): "raw" | "equipped" | null {
   const trimmed = text.replace(/\s+/g, " ").trim().toLowerCase();
   if (!trimmed) return null;
-  if (trimmed.includes("varuste")) {
+  if (trimmed.includes("varuste") || trimmed.includes("equipped")) {
     return "equipped";
   }
   if (
