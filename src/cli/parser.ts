@@ -785,7 +785,7 @@ function parseLifters(doc: Document): LiftersOutcome {
       issues.push({
         severity: "warning",
         code: "rows_dropped",
-        message: `Table ${tableIndex}: ${droppedRows.length} row(s) dropped unexpectedly (first: ${droppedRows[0].reason})`,
+        message: `Table ${tableIndex}: ${droppedRows.length} row(s) dropped unexpectedly (first: ${droppedRows[0].reason} — "${droppedRows[0].snippet}")`,
         tableIndex,
         snippet: droppedRows[0].snippet,
       });
