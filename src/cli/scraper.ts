@@ -118,7 +118,9 @@ export async function discoverCompetitions(
             `Clicked "Load more" under ${name} (${i + 1}/${loadMoreClicks})`,
           );
           await new Promise((r) => setTimeout(r, 2000)); // Wait for content
-        } catch {
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          onProgress?.(`Load more failed under ${name}: ${msg}`);
           break;
         }
       }
