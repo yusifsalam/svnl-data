@@ -12,6 +12,8 @@ export function SettingsView({
   onOutputDirChange,
   logDir,
   onLogDirChange,
+  loadMoreClicks,
+  onLoadMoreClicksChange,
   onBack,
 }: {
   outputMode: OutputMode;
@@ -22,18 +24,19 @@ export function SettingsView({
   onOutputDirChange: (dir: string) => void;
   logDir: string;
   onLogDirChange: (dir: string) => void;
+  loadMoreClicks: number;
+  onLoadMoreClicksChange: (n: number) => void;
   onBack: () => void;
 }) {
-  const [editingField, setEditingField] = useState<"output" | "log" | null>(
-    null,
-  );
+  const [editingField, setEditingField] = useState<
+    "output" | "log" | "clicks" | null
+  >(null);
   const [dirInput, setDirInput] = useState("");
 
   useInput((input, key) => {
     if (key.escape) {
       if (editingField) {
         setEditingField(null);
-        setDirInput(editingField === "output" ? outputDir : logDir);
       } else {
         onBack();
       }
@@ -41,6 +44,12 @@ export function SettingsView({
     }
     if (!editingField) return;
     if (key.return) {
+      if (editingField === "clicks") {
+        const n = parseInt(dirInput.trim(), 10);
+        onLoadMoreClicksChange(Number.isInteger(n) && n >= 0 ? n : 0);
+        setEditingField(null);
+        return;
+      }
       let next = dirInput.trim() || ".";
       if (next.startsWith("./Users/")) {
         next = next.slice(1);
@@ -61,7 +70,9 @@ export function SettingsView({
       return;
     }
     if (input) {
-      setDirInput((prev) => prev + input);
+      const accepted =
+        editingField === "clicks" ? input.replace(/[^0-9]/g, "") : input;
+      if (accepted) setDirInput((prev) => prev + accepted);
     }
   });
 
@@ -90,6 +101,10 @@ export function SettingsView({
       label: `Log directory: ${logDir}`,
       value: "log-dir",
     },
+    {
+      label: `Load more clicks per section: ${loadMoreClicks}`,
+      value: "clicks",
+    },
     { label: "Back", value: "back" },
   ];
 
@@ -100,11 +115,18 @@ export function SettingsView({
         {editingField ? (
           <Box flexDirection="column">
             <Text>
-              {editingField === "output" ? "Output" : "Log"} directory (Enter to
-              save, Esc to cancel):
+              {editingField === "clicks"
+                ? "Load more clicks per section"
+                : `${editingField === "output" ? "Output" : "Log"} directory`}{" "}
+              (Enter to save, Esc to cancel):
             </Text>
             <Text color="gray">
-              Current: {editingField === "output" ? outputDir : logDir}
+              Current:{" "}
+              {editingField === "clicks"
+                ? loadMoreClicks
+                : editingField === "output"
+                  ? outputDir
+                  : logDir}
             </Text>
             <Text color="cyan">{dirInput || " "}</Text>
           </Box>
@@ -120,6 +142,9 @@ export function SettingsView({
               } else if (item.value === "log-dir") {
                 setDirInput("");
                 setEditingField("log");
+              } else if (item.value === "clicks") {
+                setDirInput(String(loadMoreClicks));
+                setEditingField("clicks");
               } else if (item.value === "format-csv") {
                 onFormatChange("csv");
                 onBack();

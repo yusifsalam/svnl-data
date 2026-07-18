@@ -33,11 +33,16 @@ async function saveSettings(
   outputFormat: OutputFormat,
   outputDir: string,
   logDir: string,
+  loadMoreClicks: number,
 ) {
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(
     SETTINGS_FILE,
-    JSON.stringify({ outputMode, outputFormat, outputDir, logDir }, null, 2),
+    JSON.stringify(
+      { outputMode, outputFormat, outputDir, logDir, loadMoreClicks },
+      null,
+      2,
+    ),
   );
 }
 
@@ -52,6 +57,7 @@ function App() {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
   const [outputDir, setOutputDir] = useState("./output");
   const [logDir, setLogDir] = useState("./logs");
+  const [loadMoreClicks, setLoadMoreClicks] = useState(5);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
@@ -89,14 +95,28 @@ function App() {
       if (typeof data.logDir === "string" && data.logDir.trim()) {
         setLogDir(data.logDir);
       }
+      if (
+        typeof data.loadMoreClicks === "number" &&
+        Number.isInteger(data.loadMoreClicks) &&
+        data.loadMoreClicks >= 0
+      ) {
+        setLoadMoreClicks(data.loadMoreClicks);
+      }
     }
     setSettingsLoaded(true);
   }
 
   useEffect(() => {
     if (!settingsLoaded) return;
-    saveSettings(outputMode, outputFormat, outputDir, logDir);
-  }, [outputMode, outputFormat, outputDir, logDir, settingsLoaded]);
+    saveSettings(outputMode, outputFormat, outputDir, logDir, loadMoreClicks);
+  }, [
+    outputMode,
+    outputFormat,
+    outputDir,
+    logDir,
+    loadMoreClicks,
+    settingsLoaded,
+  ]);
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -134,7 +154,7 @@ function App() {
             try {
               const startedAt = Date.now();
               const comps = await discoverCompetitions({
-                loadMoreClicks: 5,
+                loadMoreClicks,
                 onProgress: setProgress,
               });
               setCompetitions(comps);
@@ -284,6 +304,8 @@ function App() {
           onOutputDirChange={(dir) => setOutputDir(dir)}
           logDir={logDir}
           onLogDirChange={(dir) => setLogDir(dir)}
+          loadMoreClicks={loadMoreClicks}
+          onLoadMoreClicksChange={(n) => setLoadMoreClicks(n)}
           onBack={() => setScreen("menu")}
         />
       )}
