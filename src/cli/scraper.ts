@@ -19,6 +19,11 @@ import { validateCompetitionResult } from "./validate";
 const SVNL_ARCHIVE_URL =
   "https://www.suomenvoimanostoliitto.fi/kilpailut/tulosarkisto/";
 
+const DISCOVERY_SECTIONS = [
+  { name: "Kansalliset kilpailut", category: "local" },
+  { name: "SM-kilpailut", category: "nationals" },
+] as const;
+
 interface DiscoverOptions {
   loadMoreClicks?: number;
   browserPath?: string;
@@ -67,37 +72,62 @@ export async function discoverCompetitions(
     onProgress?.("Loading SVNL archive page...");
     await page.goto(SVNL_ARCHIVE_URL, { waitUntil: "networkidle2" });
 
-    // Click "Load more" button multiple times
-    for (let i = 0; i < loadMoreClicks; i++) {
-      try {
-        const clicked = await page.evaluate(() => {
-          const buttons = Array.from(document.querySelectorAll("button"));
-          const loadMoreBtn = buttons.find((btn) =>
-            btn.textContent?.includes("Lataa lisää"),
-          );
-          if (loadMoreBtn && !(loadMoreBtn as HTMLButtonElement).disabled) {
-            loadMoreBtn.click();
-            return true;
-          }
-          return false;
-        });
+    // Each section is a separate AJAX grid with its own "Lataa lisää" button,
+    // so page through them independently.
+    for (const { name } of DISCOVERY_SECTIONS) {
+      for (let i = 0; i < loadMoreClicks; i++) {
+        try {
+          const clicked = await page.evaluate((sectionName) => {
+            const h2s = Array.from(document.querySelectorAll("h2"));
+            const idx = h2s.findIndex(
+              (h) => h.textContent?.trim() === sectionName,
+            );
+            if (idx === -1) return false;
+            const h2 = h2s[idx];
+            const nextH2 = h2s[idx + 1] || null;
 
-        if (!clicked) {
-          onProgress?.("No more competitions to load");
+            const isAfterSection = (btn: Element) =>
+              (h2.compareDocumentPosition(btn) &
+                Node.DOCUMENT_POSITION_FOLLOWING) !==
+              0;
+            const isBeforeNextSection = (btn: Element) =>
+              !nextH2 ||
+              (nextH2.compareDocumentPosition(btn) &
+                Node.DOCUMENT_POSITION_PRECEDING) !==
+                0;
+
+            const loadMoreBtn = Array.from(
+              document.querySelectorAll("button"),
+            ).find(
+              (btn) =>
+                btn.textContent?.includes("Lataa lisää") &&
+                isAfterSection(btn) &&
+                isBeforeNextSection(btn),
+            );
+
+            if (loadMoreBtn && !(loadMoreBtn as HTMLButtonElement).disabled) {
+              loadMoreBtn.click();
+              return true;
+            }
+            return false;
+          }, name);
+
+          if (!clicked) break;
+
+          onProgress?.(
+            `Clicked "Load more" under ${name} (${i + 1}/${loadMoreClicks})`,
+          );
+          await new Promise((r) => setTimeout(r, 2000)); // Wait for content
+        } catch {
           break;
         }
-
-        onProgress?.(`Clicked "Load more" (${i + 1}/${loadMoreClicks})`);
-        await new Promise((r) => setTimeout(r, 2000)); // Wait for content
-      } catch {
-        break;
       }
     }
 
     // Extract competition links from specific sections
     onProgress?.("Extracting competition links...");
 
-    const competitions = await page.evaluate(() => {
+    const competitions = await page.evaluate((sections) => {
       const results: Array<{
         id: string;
         url: string;
@@ -149,12 +179,12 @@ export async function discoverCompetitions(
         }
       }
 
-      // Extract from the sections we want (in order)
-      extractFromSection("Kansalliset kilpailut", "local");
-      extractFromSection("SM-kilpailut", "nationals");
+      for (const { name, category } of sections) {
+        extractFromSection(name, category);
+      }
 
       return results;
-    });
+    }, DISCOVERY_SECTIONS);
 
     onProgress?.(`Found ${competitions.length} competitions`);
 

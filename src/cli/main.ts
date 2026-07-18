@@ -104,7 +104,7 @@ function printValidationDetails(results: CompetitionResult[]) {
 program
   .command("discover")
   .description("Discover competitions from SVNL archive")
-  .option("-c, --clicks <number>", "Number of 'Load more' clicks", "0")
+  .option("-c, --clicks <number>", "Number of 'Load more' clicks per section", "0")
   .option("-b, --browser <path>", "Path to Chrome/Chromium")
   .option("--log-dir <dir>", "Log directory", "./logs")
   .option("--json", "Output JSON events (for SwiftUI)")
