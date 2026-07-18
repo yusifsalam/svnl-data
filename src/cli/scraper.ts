@@ -1,4 +1,4 @@
-import puppeteer from "puppeteer-core";
+import puppeteer, { type Page } from "puppeteer-core";
 import { parseCompetitionPage } from "./parser";
 import type {
   Competition,
@@ -45,6 +45,47 @@ export class ScrapeParseError extends Error {
   }
 }
 
+// The section's grid renders a hidden .w-grid-json whose onclick payload holds
+// max_num_pages. Must be read on the clean page: once a section loads more, the
+// DOM changes and reads for other sections come back wrong. Returns 0 if unread.
+async function sectionMaxPages(
+  page: Page,
+  sectionName: string,
+): Promise<number> {
+  return page.evaluate((name) => {
+    const h2s = Array.from(document.querySelectorAll("h2"));
+    const idx = h2s.findIndex((h) => h.textContent?.trim() === name);
+    if (idx === -1) return 0;
+    const h2 = h2s[idx];
+    const nextH2 = h2s[idx + 1] || null;
+
+    const jsonEl = Array.from(document.querySelectorAll(".w-grid-json")).find(
+      (el) => {
+        const after =
+          (h2.compareDocumentPosition(el) &
+            Node.DOCUMENT_POSITION_FOLLOWING) !==
+          0;
+        const before =
+          !nextH2 ||
+          (nextH2.compareDocumentPosition(el) &
+            Node.DOCUMENT_POSITION_PRECEDING) !==
+            0;
+        return after && before;
+      },
+    );
+    if (!jsonEl) return 0;
+
+    try {
+      const cfg = JSON.parse(
+        (jsonEl.getAttribute("onclick") || "").replace(/^return /, ""),
+      );
+      return typeof cfg.max_num_pages === "number" ? cfg.max_num_pages : 0;
+    } catch {
+      return 0;
+    }
+  }, sectionName);
+}
+
 /**
  * Discover competitions from SVNL archive page
  * Uses Puppeteer because the page requires clicking "Load more" buttons
@@ -72,10 +113,26 @@ export async function discoverCompetitions(
     onProgress?.("Loading SVNL archive page...");
     await page.goto(SVNL_ARCHIVE_URL, { waitUntil: "networkidle2" });
 
+    // loadMoreClicks < 0 means "load all": read each section's page count from
+    // the clean page up front (reading it after a section has loaded mutates
+    // the DOM and corrupts later reads). page 1 is pre-rendered, so the number
+    // of "Load more" clicks needed is max_num_pages - 1.
+    const targetClicksFor = new Map<string, number>();
+    for (const { name } of DISCOVERY_SECTIONS) {
+      if (loadMoreClicks < 0) {
+        const maxPages = await sectionMaxPages(page, name);
+        targetClicksFor.set(name, maxPages > 1 ? maxPages - 1 : 0);
+      } else {
+        targetClicksFor.set(name, loadMoreClicks);
+      }
+    }
+
     // Each section is a separate AJAX grid with its own "Lataa lisää" button,
     // so page through them independently.
     for (const { name } of DISCOVERY_SECTIONS) {
-      for (let i = 0; i < loadMoreClicks; i++) {
+      const targetClicks = targetClicksFor.get(name) ?? 0;
+
+      for (let i = 0; i < targetClicks; i++) {
         try {
           const clicked = await page.evaluate((sectionName) => {
             const h2s = Array.from(document.querySelectorAll("h2"));
@@ -115,7 +172,7 @@ export async function discoverCompetitions(
           if (!clicked) break;
 
           onProgress?.(
-            `Clicked "Load more" under ${name} (${i + 1}/${loadMoreClicks})`,
+            `Clicked "Load more" under ${name} (${i + 1}/${targetClicks})`,
           );
           await new Promise((r) => setTimeout(r, 2000)); // Wait for content
         } catch (error) {

@@ -98,7 +98,7 @@ function App() {
       if (
         typeof data.loadMoreClicks === "number" &&
         Number.isInteger(data.loadMoreClicks) &&
-        data.loadMoreClicks >= 0
+        data.loadMoreClicks >= -1
       ) {
         setLoadMoreClicks(data.loadMoreClicks);
       }

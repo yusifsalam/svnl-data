@@ -46,7 +46,8 @@ export function SettingsView({
     if (key.return) {
       if (editingField === "clicks") {
         const n = parseInt(dirInput.trim(), 10);
-        onLoadMoreClicksChange(Number.isInteger(n) && n >= 0 ? n : 0);
+        // -1 = load all pages; anything else invalid falls back to 0.
+        onLoadMoreClicksChange(Number.isInteger(n) && n >= -1 ? n : 0);
         setEditingField(null);
         return;
       }
@@ -70,9 +71,16 @@ export function SettingsView({
       return;
     }
     if (input) {
-      const accepted =
-        editingField === "clicks" ? input.replace(/[^0-9]/g, "") : input;
-      if (accepted) setDirInput((prev) => prev + accepted);
+      if (editingField === "clicks") {
+        // Digits, plus a leading "-" so -1 (load all) is enterable.
+        setDirInput((prev) => {
+          const digits = input.replace(/[^0-9]/g, "");
+          const minus = prev === "" && input.includes("-") ? "-" : "";
+          return prev + minus + digits;
+        });
+      } else {
+        setDirInput((prev) => prev + input);
+      }
     }
   });
 
@@ -102,7 +110,7 @@ export function SettingsView({
       value: "log-dir",
     },
     {
-      label: `Load more clicks per section: ${loadMoreClicks}`,
+      label: `Load more clicks per section: ${loadMoreClicks < 0 ? "all" : loadMoreClicks}`,
       value: "clicks",
     },
     { label: "Back", value: "back" },
@@ -116,14 +124,16 @@ export function SettingsView({
           <Box flexDirection="column">
             <Text>
               {editingField === "clicks"
-                ? "Load more clicks per section"
+                ? "Load more clicks per section (-1 = all pages)"
                 : `${editingField === "output" ? "Output" : "Log"} directory`}{" "}
               (Enter to save, Esc to cancel):
             </Text>
             <Text color="gray">
               Current:{" "}
               {editingField === "clicks"
-                ? loadMoreClicks
+                ? loadMoreClicks < 0
+                  ? "all"
+                  : loadMoreClicks
                 : editingField === "output"
                   ? outputDir
                   : logDir}
